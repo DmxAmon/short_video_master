@@ -2,18 +2,17 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
+  workflow_dispatch: # 允许手动触发
+
+# 设置并发控制，确保同时只有一个部署任务运行
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -34,14 +33,26 @@ jobs:
         VITE_API_BASE_URL: https://fsbk.dy2bcsm.cn/api
         
     - name: Setup Pages
-      uses: actions/configure-pages@v3
+      uses: actions/configure-pages@v4
       
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v2
+      uses: actions/upload-pages-artifact@v3
       with:
         path: ./dist
-        
+
+  # 分离部署任务
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v2
-      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' 
+      uses: actions/deploy-pages@v4 
