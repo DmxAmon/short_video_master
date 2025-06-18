@@ -5,14 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch: # 允许手动触发
 
-# 设置并发控制，确保同时只有一个部署任务运行
+# 更强的并发控制
 concurrency:
   group: "pages"
   cancel-in-progress: true
-
-env:
-  NODE_ENV: production
-  VITE_API_BASE_URL: https://fsbk.dy2bcsm.cn/api
 
 jobs:
   deploy:
@@ -33,34 +29,30 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
         
-    - name: Clean npm cache
-      run: npm cache clean --force
-      
     - name: Install dependencies
       run: |
-        npm ci
-        npm list vite || echo "Vite not found in node_modules"
-        npx vite --version || echo "Vite command not available"
+        echo "Installing dependencies..."
+        npm install
+        echo "Checking vite installation..."
+        npm list vite
+        echo "Vite version:"
+        npx vite --version
         
-    - name: Debug dependencies
+    - name: Build project
       run: |
-        echo "Node version: $(node --version)"
-        echo "NPM version: $(npm --version)"
-        echo "Current directory: $(pwd)"
-        echo "Files in node_modules/.bin:"
-        ls -la node_modules/.bin/ | head -20
-        
-    - name: Build
-      run: |
-        echo "Building with environment:"
-        echo "NODE_ENV: $NODE_ENV"
-        echo "VITE_API_BASE_URL: $VITE_API_BASE_URL"
+        echo "Building project with npx vite build..."
+        echo "NODE_ENV=production"
+        echo "VITE_API_BASE_URL=https://fsbk.dy2bcsm.cn/api"
         npx vite build
       env:
-        NODE_ENV: ${{ env.NODE_ENV }}
-        VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
+        NODE_ENV: production
+        VITE_API_BASE_URL: https://fsbk.dy2bcsm.cn/api
+        
+    - name: List build output
+      run: |
+        echo "Build output directory contents:"
+        ls -la dist/
         
     - name: Setup Pages
       uses: actions/configure-pages@v4
