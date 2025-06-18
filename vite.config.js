@@ -21,7 +21,9 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: './',
+   base: process.env.NODE_ENV === 'production' 
+     ? '/short_video_master/'  // GitHub Pages 需要仓库名作为base路径
+     : './',
   server: {
     host: '0.0.0.0', // 允许局域网内其他设备访问
     port: 5173,
