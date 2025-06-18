@@ -3,13 +3,8 @@ import { envConfig } from '../config/env'
 // 正确导入飞书多维表格SDK
 import { bitable } from '@lark-base-open/js-sdk'
 
-// API基础URL - 根据当前域名动态判断
-// 如果当前域名是错误的fs.dy2bcsm.cn，则使用完整URL
-// 否则使用相对路径
-const currentHostname = window.location.hostname;
-const API_BASE_URL = currentHostname === 'fs.dy2bcsm.cn' 
-  ? 'https://fsbk.dy2bcsm.cn/api'  // 错误域名时使用硬编码的完整URL
-  : '/api';                        // 正确域名时使用相对路径
+// API基础URL - 使用envConfig中的配置，确保与环境配置一致
+const API_BASE_URL = envConfig.apiUrl;
 
 // 记录环境和请求基础URL信息，便于问题排查
 console.log('=== 认证服务初始化 ===');
@@ -17,6 +12,7 @@ console.log('当前环境:', envConfig.isDevelopment ? '开发环境' : '生产�
 console.log('API认证服务使用基础URL:', API_BASE_URL); // 记录当前使用的API基础URL
 console.log('当前页面URL:', window.location.href); // 记录当前页面URL
 console.log('当前域名:', window.location.hostname); // 记录当前域名
+console.log('是否GitHub Pages:', envConfig.currentDomain.isGitHubPages);
 
 // 检测飞书SDK环境
 console.log('=== 飞书SDK环境检测 ===');

@@ -7,18 +7,15 @@ import { createLogger } from '../utils/logger';
 const logger = createLogger('API');
 
 // !! 确认后端API基础路径 !!
-// 根据当前域名动态判断API基础URL
-// 如果是错误域名fs.dy2bcsm.cn，使用完整URL，否则使用相对路径
-const currentHostname = window.location.hostname;
-const API_BASE_URL = currentHostname === 'fs.dy2bcsm.cn' 
-  ? 'https://fsbk.dy2bcsm.cn/api'  // 错误域名时使用硬编码的完整URL
-  : '/api';                        // 正确域名时使用相对路径
+// 使用envConfig中的API地址配置，确保与环境配置一致
+const API_BASE_URL = envConfig.apiUrl;
 
 // 记录当前环境信息，便于问题排查
 logger.info('API服务初始化', {
   environment: envConfig.isDevelopment ? '开发环境' : '生产环境',
-  hostname: currentHostname,
-  baseURL: API_BASE_URL
+  hostname: window.location.hostname,
+  baseURL: API_BASE_URL,
+  isGitHubPages: envConfig.currentDomain.isGitHubPages
 });
 
 const service = axios.create({
