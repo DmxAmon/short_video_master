@@ -10,12 +10,16 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+env:
+  NODE_ENV: production
+  VITE_API_BASE_URL: https://fsbk.dy2bcsm.cn/api
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pages: write
+      pages: write  
       id-token: write
     environment:
       name: github-pages
@@ -31,14 +35,32 @@ jobs:
         node-version: '18'
         cache: 'npm'
         
-    - name: Install dependencies
-      run: npm ci
+    - name: Clean npm cache
+      run: npm cache clean --force
       
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm list vite || echo "Vite not found in node_modules"
+        npx vite --version || echo "Vite command not available"
+        
+    - name: Debug dependencies
+      run: |
+        echo "Node version: $(node --version)"
+        echo "NPM version: $(npm --version)"
+        echo "Current directory: $(pwd)"
+        echo "Files in node_modules/.bin:"
+        ls -la node_modules/.bin/ | head -20
+        
     - name: Build
-      run: npm run build
+      run: |
+        echo "Building with environment:"
+        echo "NODE_ENV: $NODE_ENV"
+        echo "VITE_API_BASE_URL: $VITE_API_BASE_URL"
+        npx vite build
       env:
-        NODE_ENV: production
-        VITE_API_BASE_URL: https://fsbk.dy2bcsm.cn/api
+        NODE_ENV: ${{ env.NODE_ENV }}
+        VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}
         
     - name: Setup Pages
       uses: actions/configure-pages@v4
