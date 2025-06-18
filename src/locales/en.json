@@ -1,0 +1,76 @@
+{
+  "label": {
+    "base": "Table",
+    "view": "View",
+    "field": "Field",
+    "current": "Current Cell Data"
+  },
+  "placeholder": {
+    "base": "Select Table",
+    "view": "Select View",
+    "field": "Select Field"
+  },
+  "nav": {
+    "input": "Input",
+    "preview": "Preview",
+    "mapping": "Mapping",
+    "transcription": "Transcription",
+    "history": "History"
+  },
+  "input": {
+    "title": "Enter Douyin Creator ID",
+    "secUserId": "Douyin User ID",
+    "secUserIdPlaceholder": "Enter Douyin User ID or Link",
+    "search": "Search"
+  },
+  "preview": {
+    "title": "Creator Data Preview",
+    "followers": "Followers",
+    "likes": "Likes",
+    "videos": "Videos",
+    "videosList": "Videos List",
+    "importData": "Import Data",
+    "transcribe": "Transcribe Videos",
+    "videoTitle": "Video Title",
+    "playCount": "Play Count",
+    "likeCount": "Like Count",
+    "duration": "Duration"
+  },
+  "mapping": {
+    "title": "Data Mapping Configuration",
+    "fieldMapping": "Field Mapping",
+    "saveMapping": "Save Mapping",
+    "syncData": "Sync Data",
+    "douyinFields": {
+      "title": "Video Title",
+      "playCount": "Play Count",
+      "likeCount": "Like Count",
+      "duration": "Duration",
+      "createTime": "Create Time"
+    }
+  },
+  "transcription": {
+    "title": "Video Transcription",
+    "noVideosSelected": "No Videos Selected",
+    "selectVideos": "Select Videos",
+    "selectedVideos": "Selected Videos",
+    "settings": "Transcription Settings",
+    "language": "Language",
+    "format": "Format",
+    "pointsNeeded": "Points Needed",
+    "pointsAvailable": "Points Available",
+    "startTranscription": "Start Transcription",
+    "results": "Transcription Results",
+    "copy": "Copy",
+    "saveToBase": "Save to Base",
+    "noVideosFound": "No Videos Found",
+    "gatherData": "Gather Data"
+  },
+  "history": {
+    "title": "History",
+    "noRecords": "No History Records",
+    "videoTitle": "Video Title",
+    "createTime": "Create Time",
+    "status": "Status"
+  }
+}

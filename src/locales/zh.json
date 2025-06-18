@@ -1,0 +1,94 @@
+{
+  "label": {
+    "base": "数据表",
+    "view": "视图",
+    "field": "字段",
+    "current": "当前选中单元格数据"
+  },
+  "placeholder": {
+    "base": "请选择数据表",
+    "view": "请选择视图",
+    "field": "请选择字段"
+  },
+  "nav": {
+    "input": "输入",
+    "preview": "预览",
+    "mapping": "映射",
+    "transcription": "转写",
+    "history": "历史",
+    "markdown": "Markdown预览"
+  },
+  "input": {
+    "title": "输入抖音博主ID",
+    "secUserId": "抖音用户ID",
+    "secUserIdPlaceholder": "请输入抖音用户ID或链接",
+    "search": "搜索"
+  },
+  "preview": {
+    "title": "博主数据预览",
+    "followers": "粉丝数",
+    "likes": "获赞数",
+    "videos": "视频数",
+    "videosList": "视频列表",
+    "importData": "导入数据",
+    "transcribe": "转写视频",
+    "videoTitle": "视频标题",
+    "playCount": "播放量",
+    "likeCount": "点赞数",
+    "duration": "时长"
+  },
+  "mapping": {
+    "title": "数据映射配置",
+    "fieldMapping": "字段映射",
+    "saveMapping": "保存映射",
+    "syncData": "同步数据",
+    "douyinFields": {
+      "title": "视频标题",
+      "playCount": "播放量",
+      "likeCount": "点赞数",
+      "duration": "时长",
+      "createTime": "创建时间"
+    }
+  },
+  "transcription": {
+    "title": "视频转写",
+    "noVideosSelected": "未选择任何视频",
+    "selectVideos": "选择视频",
+    "selectedVideos": "已选择视频",
+    "settings": {
+      "title": "转写设置",
+      "language": "语言",
+      "format": "格式",
+      "memberFeature": "会员专享"
+    },
+    "pointsNeeded": "所需积分",
+    "pointsAvailable": "可用积分",
+    "startTranscription": "开始转写",
+    "results": "转写结果",
+    "copy": "复制",
+    "saveToBase": "保存到多维表格",
+    "noVideosFound": "未找到视频数据",
+    "gatherData": "去采集数据"
+  },
+  "history": {
+    "title": "历史记录",
+    "noRecords": "暂无历史记录",
+    "videoTitle": "视频标题",
+    "createTime": "创建时间",
+    "status": "状态"
+  },
+  "markdown": {
+    "title": "Markdown内容预览",
+    "intro": "此功能可增强显示飞书多维表格中的Markdown内容，提供更友好的阅读体验",
+    "selectCell": "请在多维表格中点击任意单元格，内容将显示在此处",
+    "cellMode": "单元格模式",
+    "columnMode": "整列模式",
+    "columnModePremium": "整列模式 (会员专享)",
+    "copyContent": "复制内容",
+    "copyColumn": "复制整列数据",
+    "noContent": "尚未选择单元格内容",
+    "tableName": "表格",
+    "fieldName": "字段",
+    "memberFeature": "会员功能：点击表格中任意单元格，将显示该列所有Markdown内容"
+  }
+}

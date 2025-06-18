@@ -1,0 +1,76 @@
+{
+  "label": {
+    "base": "テーブル",
+    "view": "ビュー",
+    "field": "フィールド",
+    "current": "現在のセルデータ"
+  },
+  "placeholder": {
+    "base": "テーブルを選択",
+    "view": "ビューを選択",
+    "field": "フィールドを選択"
+  },
+  "nav": {
+    "input": "入力",
+    "preview": "プレビュー",
+    "mapping": "マッピング",
+    "transcription": "文字起こし",
+    "history": "履歴"
+  },
+  "input": {
+    "title": "抖音クリエイターIDを入力",
+    "secUserId": "抖音ユーザーID",
+    "secUserIdPlaceholder": "抖音ユーザーIDまたはリンクを入力",
+    "search": "検索"
+  },
+  "preview": {
+    "title": "クリエイターデータプレビュー",
+    "followers": "フォロワー数",
+    "likes": "いいね数",
+    "videos": "動画数",
+    "videosList": "動画リスト",
+    "importData": "データをインポート",
+    "transcribe": "動画を文字起こし",
+    "videoTitle": "動画タイトル",
+    "playCount": "再生回数",
+    "likeCount": "いいね数",
+    "duration": "長さ"
+  },
+  "mapping": {
+    "title": "データマッピング設定",
+    "fieldMapping": "フィールドマッピング",
+    "saveMapping": "マッピングを保存",
+    "syncData": "データを同期",
+    "douyinFields": {
+      "title": "動画タイトル",
+      "playCount": "再生回数",
+      "likeCount": "いいね数",
+      "duration": "長さ",
+      "createTime": "作成日時"
+    }
+  },
+  "transcription": {
+    "title": "動画の文字起こし",
+    "noVideosSelected": "動画が選択されていません",
+    "selectVideos": "動画を選択",
+    "selectedVideos": "選択された動画",
+    "settings": "文字起こし設定",
+    "language": "言語",
+    "format": "フォーマット",
+    "pointsNeeded": "必要ポイント",
+    "pointsAvailable": "利用可能ポイント",
+    "startTranscription": "文字起こし開始",
+    "results": "文字起こし結果",
+    "copy": "コピー",
+    "saveToBase": "Baseに保存",
+    "noVideosFound": "動画が見つかりません",
+    "gatherData": "データを収集"
+  },
+  "history": {
+    "title": "履歴",
+    "noRecords": "履歴レコードがありません",
+    "videoTitle": "動画タイトル",
+    "createTime": "作成日時",
+    "status": "ステータス"
+  }
+}

@@ -1,0 +1,346 @@
+@import 'reset-css';
+
+/* 全局样式变量 */
+:root {
+  /* 主色调 */
+  --primary-color: #2E6BE6;
+  --success-color: #52C41A;
+  --warning-color: #FAAD14;
+  --danger-color: #F5222D;
+  --link-color: #1890FF;
+  
+  /* 中性色 */
+  --text-primary: #303133;
+  --text-regular: #606266;
+  --text-secondary: #909399;
+  --text-placeholder: #C0C4CC;
+  --border-color: #DCDFE6;
+  --bg-light: #F2F6FC;
+  
+  /* 会员等级标识色 */
+  --member-free: #909399;
+  --member-advanced: #409EFF;
+  --member-pro: #67C23A;
+  --member-enterprise: #9254DE;
+  
+  /* 间距 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+  --spacing-xxxl: 32px;
+  
+  /* 尺寸 */
+  --default-width: 358px;
+  --min-width: 320px;
+  --max-width: 600px;
+  
+  /* 字体尺寸 */
+  --font-size-xl: 18px;
+  --font-size-lg: 16px;
+  --font-size-md: 14px;
+  --font-size-base: 13px;
+  --font-size-sm: 12px;
+  --font-size-xs: 11px;
+  
+  /* 行高 */
+  --line-height-xl: 28px;
+  --line-height-lg: 24px;
+  --line-height-md: 22px;
+  --line-height-base: 20px;
+  --line-height-sm: 18px;
+  --line-height-xs: 16px;
+  
+  /* 字重 */
+  --font-weight-bold: 600;
+  --font-weight-normal: 400;
+  
+  /* 圆角 */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  
+  /* 阴影 */
+  --box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  
+  /* 过渡 */
+  --transition-duration: 0.2s;
+}
+
+/* 基础样式 */
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: white;
+}
+
+/* 文本样式 */
+h1 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-xl);
+  margin-bottom: var(--spacing-lg);
+}
+
+h2, .page-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+h3, .section-title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+p {
+  margin-bottom: var(--spacing-md);
+}
+
+/* 辅助文本 */
+.text-secondary {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.text-small {
+  font-size: var(--font-size-sm);
+}
+
+/* 布局容器 */
+.app-container {
+  width: 100%;
+  min-width: var(--min-width);
+  max-width: var(--max-width);
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-container {
+  padding: var(--spacing-lg);
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 卡片样式 */
+.card {
+  background-color: white;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--box-shadow);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.card-compact {
+  padding: var(--spacing-md);
+}
+
+/* 导航区域 */
+.navigation-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 60px;
+  width: 100%;
+  background-color: white;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  cursor: pointer;
+  transition: color var(--transition-duration) ease;
+  color: var(--text-regular);
+}
+
+.nav-item.active {
+  color: var(--primary-color);
+}
+
+.nav-item.disabled {
+  color: var(--text-placeholder);
+  cursor: not-allowed;
+}
+
+/* 用户状态区 */
+.user-status {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  height: 60px;
+  background-color: white;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 表单组 */
+.form-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-label {
+  display: block;
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* 按钮通用样式覆盖 */
+.el-button--primary {
+  background-color: var(--primary-color);
+}
+
+/* 插件名称区 */
+.plugin-header {
+  height: 80px;
+  padding: 15px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: white;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.plugin-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+/* 会员标签 */
+.member-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  height: 20px;
+  border-radius: 10px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+}
+
+.member-tag.free {
+  background-color: #f4f4f5;
+  color: var(--member-free);
+}
+
+.member-tag.advanced {
+  background-color: #ecf5ff;
+  color: var(--member-advanced);
+}
+
+.member-tag.pro {
+  background-color: #f0f9eb;
+  color: var(--member-pro);
+}
+
+.member-tag.enterprise {
+  background-color: #f5f0fe;
+  color: var(--member-enterprise);
+}
+
+/* 响应式调整 */
+@media (max-width: 358px) {
+  .content-container {
+    padding: var(--spacing-md);
+  }
+  
+  .card {
+    padding: var(--spacing-md);
+  }
+  
+  .card-compact {
+    padding: var(--spacing-sm);
+  }
+}
+
+/* 常用功能类 */
+.text-center {
+  text-align: center;
+}
+
+.mb-0 {
+  margin-bottom: 0;
+}
+
+.mb-1 {
+  margin-bottom: var(--spacing-xs);
+}
+
+.mb-2 {
+  margin-bottom: var(--spacing-sm);
+}
+
+.mb-3 {
+  margin-bottom: var(--spacing-md);
+}
+
+.mb-4 {
+  margin-bottom: var(--spacing-lg);
+}
+
+.mt-1 {
+  margin-top: var(--spacing-xs);
+}
+
+.mt-2 {
+  margin-top: var(--spacing-sm);
+}
+
+.mt-3 {
+  margin-top: var(--spacing-md);
+}
+
+.mt-4 {
+  margin-top: var(--spacing-lg);
+}
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flex {
+  display: flex;
+}
+
+.flex-column {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-1 {
+  gap: var(--spacing-xs);
+}
+
+.gap-2 {
+  gap: var(--spacing-sm);
+}
+
+.gap-3 {
+  gap: var(--spacing-md);
+}
+
+.gap-4 {
+  gap: var(--spacing-lg);
+}
