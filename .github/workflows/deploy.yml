@@ -34,14 +34,14 @@ jobs:
         VITE_API_BASE_URL: https://fsbk.dy2bcsm.cn/api
         
     - name: Setup Pages
-      uses: actions/configure-pages@v3
+      uses: actions/configure-pages@v4
       
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v2
+      uses: actions/upload-pages-artifact@v3
       with:
         path: ./dist
         
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v2
+      uses: actions/deploy-pages@v4
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
