@@ -12,10 +12,22 @@ const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'productio
 // 获取当前域名
 const currentHostname = window.location.hostname;
 
-// 根据当前域名选择API基础URL
-const apiBaseUrl = currentHostname === 'fs.dy2bcsm.cn' 
-  ? 'https://fsbk.dy2bcsm.cn/api'  // 错误域名时使用硬编码的完整URL
-  : '/api';                        // 正确域名时使用相对路径
+// 判断是否为GitHub Pages部署
+const isGitHubPages = currentHostname.includes('github.io');
+
+// 根据当前环境和域名选择API基础URL
+let apiBaseUrl;
+
+if (isGitHubPages) {
+  // GitHub Pages部署时，使用完整的API URL
+  apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://fsbk.dy2bcsm.cn/api';
+} else if (currentHostname === 'fsbk.dy2bcsm.cn') {
+  // 正确的生产域名时使用相对路径
+  apiBaseUrl = '/api';
+} else {
+  // 其他情况（如错误域名、本地开发）使用完整URL
+  apiBaseUrl = 'https://fsbk.dy2bcsm.cn/api';
+}
 
 // 环境配置
 export const envConfig = {
@@ -29,6 +41,7 @@ export const envConfig = {
   currentDomain: {
     hostname: currentHostname,
     isCorrectDomain: currentHostname === 'fsbk.dy2bcsm.cn',
-    isIncorrectDomain: currentHostname === 'fs.dy2bcsm.cn'
+    isIncorrectDomain: currentHostname === 'fs.dy2bcsm.cn',
+    isGitHubPages: isGitHubPages
   }
 }; 
