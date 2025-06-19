@@ -238,21 +238,23 @@ function getMemberLevelName(level) {
 }
 
 /**
- * 获取功能每单位所需积分
+ * 获取功能每单位所需积分 - 生产环境真实价格
  * @param {string} featureCode 功能代码
  * @returns {number} 每单位所需积分
  */
 function getPointsPerUnit(featureCode) {
-  // 功能与积分消耗的映射
+  // 功能与积分消耗的映射 - 与前端展示的规则保持一致
   const pointsMap = {
-    'single_collect': 10,
-    'batch_collect': 20,
-    'transcription': 30, // 每分钟
-    'markdown': 5,
-    'markdown:column': 10,
-    'markdown:advanced': 15,
-    'extract': 20,
-    'download': 10
+    'single_collect': 10,          // 抖音单视频数据提取：10积分/个视频
+    'batch_collect': 1,            // 抖音作者主页批量采集：1积分/个视频
+    'multi_collect': 10,           // 抖音多链接批量提取：10积分/个链接
+    'transcription': 1,            // 基础视频转写功能：1积分/秒钟
+    'transcription:advanced': 2,   // 高级视频转写功能：2积分/秒钟
+    'markdown': 5,                 // 基础Markdown功能：5积分/次
+    'markdown:column': 5,          // 数据导出功能：5积分/次
+    'markdown:advanced': 5,        // 高级Markdown功能：5积分/次
+    'extract': 5,                  // 数据导出功能：5积分/次
+    'download': 5                  // 下载功能：5积分/次
   };
   
   return pointsMap[featureCode] || 10; // 默认10积分/单位

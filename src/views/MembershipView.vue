@@ -300,7 +300,12 @@ const memberLevelDisplay = computed(() => {
 });
 
 // 积分套餐
-const pointsPackages = ref([]);
+const pointsPackages = ref([
+  // 生产环境真实套餐价格 - 初始显示，确保用户一进来就能看到套餐
+  { id: 1, name: '10000积分', points: 10000, price: 9.9, member_price: 6.90, popular: false },
+  { id: 2, name: '50000积分', points: 50000, price: 39.9, member_price: 27.5, popular: false },
+  { id: 3, name: '100000积分', points: 100000, price: 59.9, member_price: 40.9, popular: true }
+]);
 
 // 是否为会员
 const isMember = computed(() => {
@@ -400,33 +405,26 @@ onMounted(async () => {
     ];
   }
   
-  // 获取积分套餐列表
-  try {
-    const response = await getPointsPackages();
+  // 获取积分套餐列表 - 后台异步更新，不影响初始显示
+  getPointsPackages().then(response => {
     if (response && response.data && response.data.packages) {
+      // 成功获取后端数据时，更新套餐列表
       pointsPackages.value = response.data.packages.map(pkg => ({
         id: pkg.id,
         name: pkg.name,
         points: pkg.points,
-        price: pkg.original_price,
+        price: pkg.original_price || pkg.price,
         member_price: pkg.member_price,
         popular: pkg.popular,
         description: pkg.description,
         bonus_description: pkg.bonus_description
       }));
+      console.log('积分套餐数据已从后端更新:', pointsPackages.value);
     }
-  } catch (error) {
-    console.error('获取积分套餐失败:', error);
-    // 设置默认套餐数据
-    pointsPackages.value = [
-      { id: 1, name: '100积分', points: 100, price: 1.00, member_price: 0.69, popular: false },
-      { id: 2, name: '500积分', points: 500, price: 5.00, member_price: 3.45, popular: false },
-      { id: 3, name: '1000积分', points: 1000, price: 10.00, member_price: 6.90, popular: true },
-      { id: 4, name: '2000积分', points: 2000, price: 20.00, member_price: 13.80, popular: false },
-      { id: 5, name: '5000积分', points: 5000, price: 50.00, member_price: 34.50, popular: false },
-      { id: 6, name: '10000积分', points: 10000, price: 100.00, member_price: 69.00, popular: false }
-    ];
-  }
+  }).catch(error => {
+    console.error('获取积分套餐失败，请刷新页面', error);
+    // 发生错误时保持使用初始的真实套餐数据，不改变显示
+  });
   
   // 获取本月积分消费
   try {

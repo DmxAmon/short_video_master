@@ -32,16 +32,16 @@ const pagination = reactive({
   total: 0
 });
 
-// 充值选项
+// 充值选项 - 生产环境真实价格
 const rechargeOptions = [
-  { value: 100, price: 10, label: '100积分' },
-  { value: 500, price: 45, label: '500积分', recommend: true },
-  { value: 1000, price: 80, label: '1000积分', discount: '8折' },
-  { value: 3000, price: 210, label: '3000积分', discount: '7折' }
+  { value: 1000, price: 10, label: '1000积分' },
+  { value: 2000, price: 20, label: '2000积分' },
+  { value: 5000, price: 50, label: '5000积分', recommend: true },
+  { value: 10000, price: 100, label: '10000积分' }
 ];
 
 // 选择的充值选项
-const selectedRechargeOption = ref(rechargeOptions[1]);
+const selectedRechargeOption = ref(rechargeOptions[2]); // 默认选择5000积分(推荐)
 
 // 自定义充值数量
 const customRechargeAmount = ref(null);

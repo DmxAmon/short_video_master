@@ -86,32 +86,32 @@ import { ref, reactive } from 'vue';
 import { ElMessage } from 'element-plus';
 import PaymentModal from '../components/payment/PaymentModal.vue';
 
-// 测试套餐数据
+// 测试套餐数据 - 使用真实生产环境价格
 const testPackages = ref([
   {
     id: 1,
     name: '基础套餐',
-    points: 100,
-    price: 1.00,
-    member_price: 0.69,
+    points: 1000,
+    price: 10.00,
+    member_price: 6.90,
     popular: false,
-    description: '测试用小额套餐'
+    description: '基础积分套餐'
   },
   {
     id: 2,
     name: '热门套餐',
-    points: 1000,
-    price: 10.00,
-    member_price: 6.90,
+    points: 5000,
+    price: 50.00,
+    member_price: 34.50,
     popular: true,
     description: '最受欢迎的套餐'
   },
   {
     id: 3,
     name: '超值套餐',
-    points: 5000,
-    price: 50.00,
-    member_price: 34.50,
+    points: 10000,
+    price: 100.00,
+    member_price: 69.00,
     popular: false,
     description: '大额充值优惠更多'
   }
