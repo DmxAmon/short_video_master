@@ -134,23 +134,36 @@ service.interceptors.response.use(
 
     // 根据后端接口文档，code为0表示业务成功
     if (res.code !== 0) {
-      // 显示业务错误信息
+      // 检查是否为令牌过期错误码 401002
+      if (res.code === 401002) {
+        logger.authEvent('检测到令牌过期错误码401002，需要刷新令牌');
+        
+        // 对于401002错误码，返回Promise.reject，让响应拦截器的401处理逻辑来处理令牌刷新
+        // 模拟401状态码错误，触发下方的令牌刷新逻辑
+        const error = new Error('Token expired (401002)');
+        (error as any).response = { 
+          status: 401, 
+          data: res,
+          config: response.config 
+        };
+        (error as any).config = response.config;
+        return Promise.reject(error);
+      }
+      
+      // 其他业务错误处理
       ElMessage({
         message: res.message || '操作失败',
         type: 'error',
         duration: 5 * 1000,
       });
 
-      // 如果是 401 (未授权或Token失效)，特殊处理
-      // 后端也可能通过特定的业务 code (如 40101) 表示 token 失效
-      if (response.status === 401 || res.code === 401) { // 假设后端也会用 code=401 表示
-        logger.authEvent('认证失效，需要重新登录');
+      // 如果是其他401相关错误或HTTP 401，特殊处理
+      if (response.status === 401 || res.code === 401 || res.code === 401001 || res.code === 401003) {
+        logger.authEvent('认证失效，需要刷新插件页面');
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user_info');
         // 触发全局事件或状态，通知应用需要重新认证
-        // 例如: window.dispatchEvent(new CustomEvent('auth-expired'));
-        // 或者直接重载页面，依赖 App.vue 的初始化逻辑来处理
         window.location.reload(); // 简单粗暴的方式
       }
 
@@ -210,7 +223,7 @@ service.interceptors.response.use(
         localStorage.removeItem('user_info');
         
         ElMessage({
-          message: '登录已过期，请重新登录',
+          message: '登录已过期，请刷新插件页面',
           type: 'warning',
           duration: 3000,
         });

@@ -40,7 +40,7 @@ api.interceptors.response.use(
     // 统一错误处理
     console.error('会员API请求错误:', error);
     
-    // 如果是401错误，清除token并提示重新登录
+    // 如果是401错误，清除token并提示刷新页面
     if (error.response && error.response.status === 401) {
       console.error('Token已过期或无效，清除本地认证信息');
       localStorage.removeItem('access_token');
@@ -48,7 +48,7 @@ api.interceptors.response.use(
       localStorage.removeItem('user_info');
       localStorage.removeItem('token_expires_at');
       
-      // 可以在这里触发重新登录或跳转到登录页面
+      // 可以在这里触发页面刷新或重新初始化认证
       // 暂时只记录日志，避免影响其他功能
     }
     

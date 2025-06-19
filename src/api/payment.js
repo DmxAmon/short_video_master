@@ -45,8 +45,8 @@ api.interceptors.response.use(
       localStorage.removeItem('user_info');
       localStorage.removeItem('token_expires_at');
       
-      // 跳转到登录页面
-      window.location.href = '/login';
+      // 刷新页面重新初始化认证
+      window.location.reload();
     }
     
     return Promise.reject(error);

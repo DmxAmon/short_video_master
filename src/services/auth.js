@@ -364,7 +364,7 @@ export async function callApi(endpoint, options = {}) {
           });
           return retryData;
         } else {
-          throw new Error('Token已过期，请重新登录');
+          throw new Error('登陆已过期，请刷新插件页面');
         }
       }
       
