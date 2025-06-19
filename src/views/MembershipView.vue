@@ -118,7 +118,7 @@
             <h3 class="tier-name">专业会员<span class="tier-tag pro">推荐</span></h3>
             <div class="tier-price">{{ getProfessionalMemberPrice() }} <small>元/年</small></div>
             <div class="tier-points">
-              <div class="points-label">充值优惠</div>
+              <div class="points-label">积分充值优惠</div>
               <div class="points-value">6.9折</div>
             </div>
             <ul class="tier-features">
