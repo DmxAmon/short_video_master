@@ -31,6 +31,9 @@ let failedQueue: Array<{
   reject: (reason?: any) => void;
 }> = [];
 
+// 添加全局token过期标志，防止重复处理
+let isTokenExpired = false;
+
 // 处理队列中的请求
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach(({ resolve, reject }) => {
@@ -42,6 +45,33 @@ const processQueue = (error: any, token: string | null = null) => {
   });
   
   failedQueue = [];
+};
+
+// 统一处理token过期的函数
+const handleTokenExpired = (message: string = '登录已过期，请刷新插件页面') => {
+  if (isTokenExpired) {
+    return; // 已经在处理中，避免重复处理
+  }
+  
+  isTokenExpired = true;
+  logger.authEvent('Token已过期，开始清理并刷新页面');
+  
+  // 清除所有认证信息
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user_info');
+  
+  // 显示提示信息
+  ElMessage({
+    message,
+    type: 'warning',
+    duration: 2000,
+  });
+  
+  // 延迟刷新页面，让用户看到提示
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
 };
 
 // 刷新令牌函数
@@ -86,6 +116,12 @@ const refreshToken = async () => {
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
+    // 检查是否已经检测到token过期，如果是则直接拦截请求
+    if (isTokenExpired) {
+      logger.authEvent('Token已过期，拦截请求', { url: config.url });
+      return Promise.reject(new Error('Token已过期，请刷新页面'));
+    }
+    
     // 在发送请求之前做些什么
     const token = localStorage.getItem('access_token');
     
@@ -134,20 +170,11 @@ service.interceptors.response.use(
 
     // 根据后端接口文档，code为0表示业务成功
     if (res.code !== 0) {
-      // 检查是否为令牌过期错误码 401002
-      if (res.code === 401002) {
-        logger.authEvent('检测到令牌过期错误码401002，需要刷新令牌');
-        
-        // 对于401002错误码，返回Promise.reject，让响应拦截器的401处理逻辑来处理令牌刷新
-        // 模拟401状态码错误，触发下方的令牌刷新逻辑
-        const error = new Error('Token expired (401002)');
-        (error as any).response = { 
-          status: 401, 
-          data: res,
-          config: response.config 
-        };
-        (error as any).config = response.config;
-        return Promise.reject(error);
+      // 检查是否为令牌过期相关错误码
+      if (res.code === 401 || res.code === 401001 || res.code === 401002 || res.code === 401003) {
+        logger.authEvent(`检测到令牌过期错误码${res.code}，统一处理token过期`);
+        handleTokenExpired('登录已过期，刷新插件页面');
+        return Promise.reject(new Error('Token expired'));
       }
       
       // 其他业务错误处理
@@ -156,16 +183,6 @@ service.interceptors.response.use(
         type: 'error',
         duration: 5 * 1000,
       });
-
-      // 如果是其他401相关错误或HTTP 401，特殊处理
-      if (response.status === 401 || res.code === 401 || res.code === 401001 || res.code === 401003) {
-        logger.authEvent('认证失效，需要刷新插件页面');
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_info');
-        // 触发全局事件或状态，通知应用需要重新认证
-        window.location.reload(); // 简单粗暴的方式
-      }
 
       // 将业务错误视为 Promise reject，以便调用方 catch
       return Promise.reject(new Error(res.message || 'Error'));
@@ -188,57 +205,11 @@ service.interceptors.response.use(
       }
     );
     
-    // 处理401错误 - 尝试刷新令牌
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        // 如果正在刷新，将请求加入队列
-        logger.debug('令牌正在刷新中，请求加入队列', { url: originalRequest.url });
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(token => {
-          originalRequest.headers['Authorization'] = `Bearer ${token}`;
-          return service(originalRequest);
-        }).catch(err => {
-          return Promise.reject(err);
-        });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const newToken = await refreshToken();
-        processQueue(null, newToken);
-        
-        // 重试原请求
-        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-        logger.debug('使用新令牌重试请求', { url: originalRequest.url });
-        return service(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        
-        // 刷新失败，清除令牌并重载页面
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_info');
-        
-        ElMessage({
-          message: '登录已过期，请刷新插件页面',
-          type: 'warning',
-          duration: 3000,
-        });
-        
-        logger.authEvent('令牌刷新失败，即将重载页面');
-        
-        // 延迟重载，让用户看到提示信息
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-        
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    // 处理401错误 - 统一token过期处理
+    if (error.response?.status === 401) {
+      logger.authEvent('检测到HTTP 401错误，统一处理token过期');
+      handleTokenExpired('登录已过期，刷新插件页面');
+      return Promise.reject(error);
     }
     
     let message = error.message;

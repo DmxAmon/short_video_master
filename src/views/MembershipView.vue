@@ -361,6 +361,8 @@ onMounted(async () => {
   // 默认显示专业会员页面，引导用户充值
   activeTier.value = 'professional';
   
+  let hasTokenError = false; // 标记是否遇到token错误
+  
   // 获取会员等级列表和价格信息
   try {
     const response = await getMembershipLevelsNew();
@@ -376,6 +378,14 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('获取会员等级失败:', error);
+    
+    // 检查是否为token过期错误
+    if (error.message && (error.message.includes('Token') || error.message.includes('登录') || error.message.includes('过期'))) {
+      hasTokenError = true;
+      console.log('检测到token过期，停止后续API调用');
+      return; // 立即停止执行
+    }
+    
     // 设置默认数据
     membershipLevels.value = [
       {
@@ -403,6 +413,11 @@ onMounted(async () => {
         features: ['充值优惠', '优先客服', '专属标识']
       }
     ];
+  }
+  
+  // 如果前面已经检测到token错误，停止后续API调用
+  if (hasTokenError) {
+    return;
   }
   
   // 获取积分套餐列表 - 后台异步更新，不影响初始显示
@@ -447,6 +462,11 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('获取积分消费记录失败:', error);
+    // 检查是否为token过期错误，如果是则不设置模拟数据
+    if (error.message && (error.message.includes('Token') || error.message.includes('登录') || error.message.includes('过期'))) {
+      console.log('积分消费API也检测到token过期');
+      return;
+    }
     // 设置模拟数据
     monthlyPointsUsed.value = 12680;
   }
