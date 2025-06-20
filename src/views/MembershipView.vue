@@ -8,7 +8,13 @@
   <div class="membership-container">
     <div class="page-header">
       <h2 class="page-title">会员中心</h2>
-      <el-button @click="goBack" class="back-button">返回</el-button>
+      <div class="header-actions">
+        <el-button @click="joinOfficialGroup" type="success" class="join-group-button">
+          <el-icon><ChatDotSquare /></el-icon>
+          加入官方群
+        </el-button>
+        <el-button @click="goBack" class="back-button">返回</el-button>
+      </div>
     </div>
     
     <!-- 当前会员信息 -->
@@ -252,7 +258,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, Close, Medal, InfoFilled } from '@element-plus/icons-vue';
+import { Check, Close, Medal, InfoFilled, ChatDotSquare } from '@element-plus/icons-vue';
 import InfoCard from '../components/common/InfoCard.vue';
 import PaymentModal from '../components/payment/PaymentModal.vue';
 import MembershipUpgradeModal from '../components/membership/MembershipUpgradeModal.vue';
@@ -635,6 +641,41 @@ const handleMembershipUpdated = (membershipData) => {
   emit('refresh-user-info');
 };
 
+// 加入官方群
+const joinOfficialGroup = () => {
+  try {
+    // 官方群链接
+    const groupLink = 'https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=071o045c-ed23-41dc-80d2-6e28b3d194bd';
+    
+    // 显示提示信息
+    ElMessage({
+      message: '正在打开飞书群聊...',
+      type: 'success',
+      duration: 2000
+    });
+    
+    // 在飞书环境中，使用window.open打开群链接
+    // 这会触发飞书客户端处理该链接
+    window.open(groupLink, '_blank');
+    
+    // 备用提示：如果链接无法自动打开
+    setTimeout(() => {
+      ElMessageBox.alert(
+        '如果群聊没有自动打开，请复制以下链接手动加入：\n\n' + groupLink,
+        '加入官方群',
+        {
+          confirmButtonText: '我知道了',
+          type: 'info'
+        }
+      );
+    }, 3000);
+    
+  } catch (error) {
+    console.error('加入群聊失败:', error);
+    ElMessage.error('加入群聊失败，请稍后重试');
+  }
+};
+
 // 返回上一页
 const goBack = () => {
   console.log('[会员中心] 返回首页，刷新用户信息');
@@ -665,8 +706,31 @@ const goBack = () => {
   margin: 0;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.join-group-button {
+  background: linear-gradient(135deg, #67C23A, #85CE61);
+  border: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.join-group-button:hover {
+  background: linear-gradient(135deg, #85CE61, #67C23A);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3);
+}
+
+.join-group-button .el-icon {
+  margin-right: 4px;
+}
+
 .back-button {
-  margin-left: auto;
+  /* 移除 margin-left: auto; 因为现在在 header-actions 容器中 */
 }
 
 .membership-status {
