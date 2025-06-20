@@ -39,6 +39,12 @@ api.interceptors.response.use(
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user_info');
       localStorage.removeItem('token_expires_at');
+      
+      // 显示提示并刷新页面
+      setTimeout(() => {
+        alert('登录已过期，请刷新插件页面');
+        window.location.reload();
+      }, 100);
     }
     
     return Promise.reject(error);

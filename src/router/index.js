@@ -186,27 +186,37 @@ function getUserPermissions() {
         permissions = userData.permissions
       } else if (userData.user?.permissions && Array.isArray(userData.user.permissions)) {
         permissions = userData.user.permissions
-      } else if (userData.role) {
-        // 根据用户角色设置默认权限
-        console.log('[权限] 根据用户角色设置权限:', userData.role)
-        switch (userData.role) {
+      } else {
+        // 根据会员等级或用户角色设置权限
+        const memberLevel = userData.memberLevel || userData.membership?.levelCode || userData.role
+        console.log('[权限] 根据会员等级/角色设置权限:', memberLevel)
+        
+        switch (memberLevel) {
           case 'admin':
-            permissions = ['douyin:basic', 'transcribe:basic', 'douyin:batch', 'monitor:basic', 'markdown:basic', 'markdown:column', 'markdown:preview']
+            permissions = ['douyin:basic', 'extract', 'transcribe:basic', 'transcribe', 'douyin:batch', 'batch', 'monitor:basic', 'monitor', 'markdown:basic', 'markdown:column', 'markdown:preview']
             break
+          case 'professional':
+          case 'premium': 
           case 'pro':
-            permissions = ['douyin:basic', 'transcribe:basic', 'douyin:batch', 'markdown:basic', 'markdown:column', 'markdown:preview']
+            // 专业会员拥有所有权限
+            permissions = ['douyin:basic', 'extract', 'transcribe:basic', 'transcribe', 'douyin:batch', 'batch', 'monitor:basic', 'monitor', 'markdown:basic', 'markdown:column', 'markdown:preview']
             break
+          case 'advanced':
+          case 'standard':
           case 'basic':
-            permissions = ['douyin:basic', 'transcribe:basic', 'markdown:basic', 'markdown:preview']
+            // 高级会员拥有基础功能
+            permissions = ['douyin:basic', 'extract', 'transcribe:basic', 'transcribe', 'markdown:basic', 'markdown:preview']
             break
-          default: // 'user' 或其他
-            permissions = ['douyin:basic', 'transcribe:basic', 'markdown:preview']
+          case 'normal':
+          case 'free':
+          case 'user':
+          default:
+            // 普通用户拥有基础权限
+            permissions = ['douyin:basic', 'extract', 'transcribe:basic', 'transcribe', 'markdown:preview']
             break
         }
-      } else {
-        // 默认权限 - 确保用户至少可以访问基本功能
-        permissions = ['douyin:basic', 'transcribe:basic', 'markdown:preview']
-        console.log('[权限] 使用默认权限')
+        
+        console.log(`[权限] 会员等级 ${memberLevel} 获得权限:`, permissions)
       }
       
       console.log('[权限] 最终获取到用户权限:', permissions)

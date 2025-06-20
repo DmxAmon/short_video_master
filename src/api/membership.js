@@ -48,8 +48,11 @@ api.interceptors.response.use(
       localStorage.removeItem('user_info');
       localStorage.removeItem('token_expires_at');
       
-      // 可以在这里触发页面刷新或重新初始化认证
-      // 暂时只记录日志，避免影响其他功能
+      // 显示提示并刷新页面
+      setTimeout(() => {
+        alert('登录已过期，请刷新插件页面');
+        window.location.reload();
+      }, 100);
     }
     
     return Promise.reject(error);
