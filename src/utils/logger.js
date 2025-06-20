@@ -21,7 +21,7 @@ const LOG_CONFIG = {
   // 自定义日志级别（如果设置，会覆盖环境自动判断）
   // 可选值：'ERROR', 'WARN', 'INFO', 'DEBUG', 'OFF'
   // 设置为 null 时使用环境自动判断
-  customLevel: null,
+  customLevel: 'DEBUG',
   
   // 特定模块的日志控制（可以单独关闭某些模块的日志）
   moduleFilters: {
