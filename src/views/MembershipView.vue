@@ -9,6 +9,10 @@
     <div class="page-header">
       <h2 class="page-title">会员中心</h2>
       <div class="header-actions">
+        <el-button @click="joinOfficialGroup" type="success" class="join-group-button">
+          <el-icon><ChatDotSquare /></el-icon>
+          加入官方群
+        </el-button>
         <el-button @click="goBack" class="back-button">返回</el-button>
       </div>
     </div>
@@ -254,7 +258,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Check, Close, Medal, InfoFilled } from '@element-plus/icons-vue';
+import { Check, Close, Medal, InfoFilled, ChatDotSquare } from '@element-plus/icons-vue';
 import InfoCard from '../components/common/InfoCard.vue';
 import PaymentModal from '../components/payment/PaymentModal.vue';
 import MembershipUpgradeModal from '../components/membership/MembershipUpgradeModal.vue';
@@ -637,6 +641,112 @@ const handleMembershipUpdated = (membershipData) => {
   emit('refresh-user-info');
 };
 
+// 加入官方群 - 使用飞书官方推荐的方式
+const joinOfficialGroup = () => {
+  try {
+    // 官方群信息，参考飞书官方文档的 IOpenGroupChat 格式
+    const groupInfo = {
+      id: 'official_support_group',
+      name: '短视频大师官方交流群',
+      linkToken: '071o045c-ed23-41dc-80d2-6e28b3d194bd', // 群链接token
+      avatarUrl: '', // 群头像（可选）
+      enName: 'Short Video Master Support Group'
+    };
+
+    // 构建飞书官方群链接
+    const groupLink = `https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=${groupInfo.linkToken}`;
+    
+    console.log('[加群功能] 准备打开官方群:', groupInfo);
+    
+    // 显示友好的提示信息
+    ElMessage({
+      message: '正在为您打开官方交流群...',
+      type: 'success',
+      duration: 2000
+    });
+
+    // 尝试在飞书环境中调用群组API或直接跳转
+    if (typeof window !== 'undefined') {
+      // 方法1: 尝试使用飞书JSBridge（如果存在）
+      if (window.h5sdk && window.h5sdk.biz && window.h5sdk.biz.chat) {
+        console.log('[加群功能] 使用飞书JSBridge打开群聊');
+        window.h5sdk.biz.chat.openChat({
+          chatId: groupInfo.id,
+          chatType: 'group'
+        }).catch(error => {
+          console.log('[加群功能] JSBridge失败，使用备用方案:', error);
+          fallbackOpenGroup(groupLink);
+        });
+      } else {
+        // 方法2: 直接使用链接跳转
+        console.log('[加群功能] 使用链接跳转方式');
+        fallbackOpenGroup(groupLink);
+      }
+    }
+
+  } catch (error) {
+    console.error('[加群功能] 加入群聊失败:', error);
+    ElMessage.error('打开群聊失败，请稍后重试');
+  }
+};
+
+// 备用方案：使用链接打开群聊
+const fallbackOpenGroup = (groupLink) => {
+  try {
+    // 在新窗口打开群链接
+    const newWindow = window.open(groupLink, '_blank', 'noopener,noreferrer');
+    
+    // 如果弹窗被阻止，提供手动复制选项
+    setTimeout(() => {
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        console.log('[加群功能] 弹窗被阻止，显示手动加群选项');
+        showManualJoinOption(groupLink);
+      }
+    }, 1000);
+
+  } catch (error) {
+    console.error('[加群功能] 链接跳转失败:', error);
+    showManualJoinOption(groupLink);
+  }
+};
+
+// 显示手动加群选项
+const showManualJoinOption = (groupLink) => {
+  ElMessageBox.confirm(
+    `群聊链接可能被浏览器阻止，您可以：\n\n1. 点击"复制链接"手动加入\n2. 联系客服获取帮助\n\n群链接：${groupLink}`,
+    '🎉 加入官方交流群',
+    {
+      confirmButtonText: '复制链接',
+      cancelButtonText: '稍后再说',
+      type: 'info'
+    }
+  ).then(() => {
+    // 复制链接到剪贴板
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(groupLink).then(() => {
+        ElMessage.success('群链接已复制到剪贴板！');
+      }).catch(() => {
+        ElMessage.warning('复制失败，请手动复制链接');
+      });
+    } else {
+      // 备用复制方案
+      const textArea = document.createElement('textarea');
+      textArea.value = groupLink;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        ElMessage.success('群链接已复制到剪贴板！');
+      } catch (err) {
+        ElMessage.warning('复制失败，请手动复制链接');
+      }
+      document.body.removeChild(textArea);
+    }
+  }).catch(() => {
+    console.log('[加群功能] 用户取消加群');
+  });
+};
+
 
 
 // 返回上一页
@@ -673,6 +783,29 @@ const goBack = () => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.join-group-button {
+  background: linear-gradient(135deg, #67C23A, #85CE61);
+  border: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(103, 194, 58, 0.2);
+}
+
+.join-group-button:hover {
+  background: linear-gradient(135deg, #85CE61, #67C23A);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.4);
+}
+
+.join-group-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(103, 194, 58, 0.3);
+}
+
+.join-group-button .el-icon {
+  margin-right: 4px;
 }
 
 .back-button {
