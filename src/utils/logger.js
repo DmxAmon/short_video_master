@@ -13,8 +13,38 @@ const LOG_LEVELS = {
   DEBUG: 3
 };
 
-// 当前日志级别（生产环境只显示ERROR和WARN，开发环境显示所有）
-const CURRENT_LEVEL = envConfig.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN;
+// 🎛️ 日志控制开关配置
+const LOG_CONFIG = {
+  // 是否启用日志输出（总开关）
+  enabled: true,
+  
+  // 自定义日志级别（如果设置，会覆盖环境自动判断）
+  // 可选值：'ERROR', 'WARN', 'INFO', 'DEBUG', 'OFF'
+  // 设置为 null 时使用环境自动判断
+  customLevel: null,
+  
+  // 特定模块的日志控制（可以单独关闭某些模块的日志）
+  moduleFilters: {
+    // 'AUTH': false,     // 关闭认证模块日志
+    // 'API': false,      // 关闭API模块日志
+    // 'ROUTER': false,   // 关闭路由模块日志
+  }
+};
+
+// 计算当前日志级别
+const getCurrentLevel = () => {
+  if (!LOG_CONFIG.enabled) return -1; // 完全关闭
+  
+  if (LOG_CONFIG.customLevel) {
+    if (LOG_CONFIG.customLevel === 'OFF') return -1;
+    return LOG_LEVELS[LOG_CONFIG.customLevel] || LOG_LEVELS.ERROR;
+  }
+  
+  // 默认：开发环境显示所有，生产环境只显示警告和错误
+  return envConfig.isDevelopment ? LOG_LEVELS.DEBUG : LOG_LEVELS.WARN;
+};
+
+const CURRENT_LEVEL = getCurrentLevel();
 
 // 日志颜色配置
 const LOG_COLORS = {
@@ -51,9 +81,14 @@ const formatLog = (level, module, message, data) => {
  * @param {any} data 附加数据
  */
 const log = (level, module, message, data) => {
-  if (LOG_LEVELS[level] > CURRENT_LEVEL) {
-    return; // 跳过不需要的日志级别
-  }
+  // 检查总开关
+  if (!LOG_CONFIG.enabled) return;
+  
+  // 检查日志级别
+  if (LOG_LEVELS[level] > CURRENT_LEVEL) return;
+  
+  // 检查模块过滤器
+  if (LOG_CONFIG.moduleFilters[module] === false) return;
   
   const formatted = formatLog(level, module, message, data);
   const color = LOG_COLORS[level];
@@ -103,6 +138,9 @@ export const createLogger = (moduleName) => {
     }
   };
 };
+
+// 导出日志配置，允许运行时动态调整
+export { LOG_CONFIG };
 
 // 默认导出全局日志记录器
 export default createLogger('APP'); 
