@@ -13,19 +13,39 @@
       </transition-group>
     </div>
 
-    <!-- 转写统计显示 -->
-    <div class="transcription-stats" v-if="showStats && stats">
-      <div class="stats-item success">
-        ✅ 成功转写: {{ stats.successCount }}
-      </div>
-      <div class="stats-item error" v-if="stats.failedCount > 0">
-        ❌ 转写失败: {{ stats.failedCount }}
-      </div>
-      <div class="stats-item total">
-        📊 总计: {{ stats.processedCount }}
+    <!-- 转写状态显示 -->
+    <div class="transcription-status" v-if="showStats && isTranscribing">
+      <div class="status-item transcribing">
+        <span class="transcribing-icon">🎙️</span>
+        <span class="transcribing-text">正在转写，请不要切换页面</span>
+        <span class="transcribing-dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
       </div>
     </div>
 
+    <!-- 🚀 新增：批次进度显示 -->
+    <div class="batch-progress" v-if="showStats && batchInfo">
+      <div class="batch-info">
+        <span class="batch-text">批次进度: {{ batchInfo.current_batch }}/{{ batchInfo.total_batches }}</span>
+        <div class="batch-progress-bar">
+          <div class="batch-progress-fill" 
+               :style="{ width: (batchInfo.current_batch / batchInfo.total_batches) * 100 + '%' }">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🚀 新增：积分统计显示 
+    <div class="points-statistics" v-if="showStats && pointsStatistics">
+      <div class="points-info">
+        <span class="points-item">💰 已使用积分: {{ pointsStatistics.total_deducted }}</span>
+        <span class="points-item">✅ 完成条数: {{ pointsStatistics.completed_items }}</span>
+      </div>
+    </div>
+-->
     <!-- 移除实时结果列表显示 -->
     <!-- 移除批量更新确认弹窗 -->
   </div>
@@ -71,6 +91,9 @@ const stats = ref({
   failedCount: 0
 });
 const isUpdatingTable = ref(false);
+const isTranscribing = ref(false);
+const batchInfo = ref(null);
+const pointsStatistics = ref(null);
 
 // 通知ID计数器
 let notificationId = 0;
@@ -202,11 +225,47 @@ const setUpdatingState = (state) => {
   isUpdatingTable.value = state;
 };
 
+// 开始转写
+const startTranscribing = () => {
+  isTranscribing.value = true;
+  logger.info('🎙️ 开始转写');
+};
+
+// 停止转写
+const stopTranscribing = () => {
+  isTranscribing.value = false;
+  logger.info('⏹️ 停止转写');
+};
+
+// 🚀 新增：更新批次信息
+const updateBatchInfo = (newBatchInfo) => {
+  batchInfo.value = newBatchInfo;
+  logger.info('📊 更新批次信息', newBatchInfo);
+};
+
+// 🚀 新增：更新积分统计
+const updatePointsStatistics = (newPointsStats) => {
+  pointsStatistics.value = newPointsStats;
+  logger.info('💰 更新积分统计', newPointsStats);
+};
+
+// 🚀 新增：清除批次和积分信息
+const clearBatchAndPointsInfo = () => {
+  batchInfo.value = null;
+  pointsStatistics.value = null;
+  logger.info('🧹 清除批次和积分信息');
+};
+
 // 暴露方法
 defineExpose({
   addRealtimeResult,
   clearResults,
   setUpdatingState,
+  startTranscribing,
+  stopTranscribing,
+  updateBatchInfo,
+  updatePointsStatistics,
+  clearBatchAndPointsInfo,
   results: computed(() => results.value),
   stats: computed(() => stats.value)
 });
@@ -248,40 +307,105 @@ defineExpose({
   border-left-color: #dc3545;
 }
 
-/* 转写统计样式 */
-.transcription-stats {
+/* 转写状态样式 */
+.transcription-status {
   display: flex;
   gap: 16px;
   margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
-.stats-item {
-  padding: 8px 12px;
+.status-item {
+  padding: 12px 16px;
   background: #f8f9fa;
-  border-radius: 4px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.stats-item.success {
-  background: #d4edda;
+.status-item.transcribing {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb);
   color: #155724;
+  border: 2px solid #b3d7c1;
+  box-shadow: 0 2px 8px rgba(21, 87, 36, 0.1);
+  animation: transcribing-pulse 2s ease-in-out infinite;
 }
 
-.stats-item.info {
-  background: #d1ecf1;
-  color: #0c5460;
+/* 🚀 转写图标动画 */
+.transcribing-icon {
+  font-size: 16px;
+  animation: icon-bounce 1.5s ease-in-out infinite;
 }
 
-.stats-item.error {
-  background: #f8d7da;
-  color: #721c24;
+/* 🚀 转写文本样式 */
+.transcribing-text {
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
-.stats-item.total {
-  background: #e2e3e5;
-  color: #383d41;
+/* 🚀 动态点点点效果 */
+.transcribing-dots {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.transcribing-dots .dot {
+  width: 4px;
+  height: 4px;
+  background-color: #155724;
+  border-radius: 50%;
+  animation: dot-bounce 1.4s ease-in-out infinite both;
+}
+
+.transcribing-dots .dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.transcribing-dots .dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.transcribing-dots .dot:nth-child(3) {
+  animation-delay: 0s;
+}
+
+/* 🚀 动画关键帧 */
+@keyframes transcribing-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(21, 87, 36, 0.1);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(21, 87, 36, 0.2);
+  }
+}
+
+@keyframes icon-bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* 动画效果 */
@@ -298,5 +422,79 @@ defineExpose({
 .notification-leave-to {
   transform: translateX(100%);
   opacity: 0;
+}
+
+/* 🚀 新增：批次进度显示样式 */
+.batch-progress {
+  margin-bottom: 16px;
+}
+
+.batch-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.batch-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.batch-progress-bar {
+  width: 200px;
+  height: 16px;
+  background-color: #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.batch-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3, #007bff);
+  background-size: 200% 100%;
+  animation: progress-flow 2s linear infinite;
+  transition: width 0.5s ease-out;
+}
+
+/* 🚀 进度条流动动画 */
+@keyframes progress-flow {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 🚀 新增：积分统计显示样式 */
+.points-statistics {
+  margin-bottom: 16px;
+}
+
+.points-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #fff3cd, #ffeeba);
+  border-radius: 6px;
+  border: 1px solid #ffeaa7;
+}
+
+.points-item {
+  font-size: 14px;
+  font-weight: 500;
+  color: #856404;
+  animation: points-glow 3s ease-in-out infinite;
+}
+
+/* 🚀 积分统计发光效果 */
+@keyframes points-glow {
+  0%, 100% {
+    text-shadow: 0 0 2px rgba(133, 100, 4, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(133, 100, 4, 0.6);
+  }
 }
 </style> 

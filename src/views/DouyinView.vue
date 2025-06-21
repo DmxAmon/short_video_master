@@ -5,7 +5,7 @@
  * @desc       : 抖音视频链接提取视图组件
 -->
 <script setup>
-import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated, watch, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from 'axios';
 import InfoCard from '../components/common/InfoCard.vue';
@@ -36,7 +36,7 @@ const logger = createLogger('DOUYIN');
 // ==================== 主模式状态管理 ====================
 
 // 主模式状态：'video' (单视频采集), 'author' (作者主页采集), 'content' (内容预览)
-const mainMode = ref('video');
+const mainMode = ref('author');
 
 // 设置主模式
 const setMainMode = (mode) => {
@@ -542,11 +542,10 @@ const hasExtractPermission = computed(() => {
          props.user.permissions.includes('extract');
 });
 
-// 是否有高级提取权限（作者模式，需要批量权限）
+// 是否有作者提取权限（默认允许访问）
 const hasAuthorExtractPermission = computed(() => {
-  // 优先检查新的权限命名
-  return props.user.permissions.includes('douyin:batch') ||
-         props.user.permissions.includes('batch');
+  // 默认允许访问作者主页采集，不依赖后台权限
+  return true;
 });
 
 // 用于开发环境和模板渲染的标志
@@ -900,6 +899,184 @@ watch(selectedTable, () => {
   updateViewsList();
 });
 
+// ==================== 链接识别和处理功能 ====================
+
+/**
+ * 从文本中提取抖音链接
+ * @param {string} text - 包含链接的文本
+ * @returns {string} 提取出的链接或原文本
+ */
+const extractDouyinUrl = (text) => {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  
+  // 清理文本，移除多余的空格和换行
+  const cleanText = text.trim();
+  
+  // 如果已经是纯链接，直接返回
+  if (cleanText.startsWith('http')) {
+    return cleanText;
+  }
+  
+  // 抖音链接的正则表达式模式
+  const douyinPatterns = [
+    // v.douyin.com 短链接
+    /https?:\/\/v\.douyin\.com\/[A-Za-z0-9_-]+\/?/g,
+    // www.douyin.com 完整链接
+    /https?:\/\/(?:www\.)?douyin\.com\/[^\s]+/g,
+    // 无协议的链接
+    /(?:v\.douyin\.com|www\.douyin\.com)\/[A-Za-z0-9_\/-]+/g
+  ];
+  
+  // 尝试匹配各种抖音链接格式
+  for (const pattern of douyinPatterns) {
+    const matches = cleanText.match(pattern);
+    if (matches && matches.length > 0) {
+      let url = matches[0];
+      
+      // 如果没有协议，添加 https://
+      if (!url.startsWith('http')) {
+        url = 'https://' + url;
+      }
+      
+      // 清理链接末尾的无关字符
+      url = url.replace(/[^\w\-\/.?=&:]+$/, '');
+      
+      logger.info('从文本中提取到抖音链接', { 
+        originalText: text, 
+        extractedUrl: url 
+      });
+      
+      return url;
+    }
+  }
+  
+  // 如果没有找到链接，返回原文本
+  logger.warn('未能从文本中提取到有效的抖音链接', { text: cleanText });
+  return cleanText;
+};
+
+/**
+ * 处理输入框内容变化，自动识别和提取链接
+ * @param {string} value - 输入的值
+ * @param {number} index - 输入框索引
+ * @param {string} mode - 模式 ('video' 或 'author')
+ */
+const handleUrlInputChange = (value, index, mode) => {
+  // 提取链接
+  const extractedUrl = extractDouyinUrl(value);
+  
+  // 更新对应的输入框
+  if (mode === 'video') {
+    videoInputUrls.value[index] = extractedUrl;
+  } else if (mode === 'author') {
+    authorInputUrls.value[index] = extractedUrl;
+  }
+  
+  // 如果提取的链接与原始输入不同，显示提示
+  if (extractedUrl !== value && extractedUrl.startsWith('http')) {
+    ElMessage.success({
+      message: '已自动识别并提取抖音链接',
+      duration: 2000
+    });
+  }
+};
+
+/**
+ * 验证抖音链接格式
+ * @param {string} url - 要验证的链接
+ * @returns {boolean} 是否为有效的抖音链接
+ */
+const isValidDouyinUrl = (url) => {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  
+  const douyinDomains = [
+    'v.douyin.com',
+    'www.douyin.com',
+    'douyin.com'
+  ];
+  
+  try {
+    const urlObj = new URL(url);
+    return douyinDomains.some(domain => urlObj.hostname.includes(domain));
+  } catch {
+    // 如果不是有效URL，检查是否包含抖音域名
+    return douyinDomains.some(domain => url.includes(domain));
+  }
+};
+
+/**
+ * 批量处理粘贴的多个链接
+ * @param {string} pastedText - 粘贴的文本
+ * @param {number} currentIndex - 当前输入框索引
+ * @param {string} mode - 模式
+ */
+const handleBatchUrlPaste = (pastedText, currentIndex, mode) => {
+  // 按行分割文本
+  const lines = pastedText.split(/[\r\n]+/).filter(line => line.trim());
+  
+  if (lines.length <= 1) {
+    // 单行文本，正常处理
+    return;
+  }
+  
+  // 多行文本，尝试提取多个链接
+  const extractedUrls = lines
+    .map(line => extractDouyinUrl(line))
+    .filter(url => url && isValidDouyinUrl(url));
+  
+  if (extractedUrls.length > 1 && mode === 'video' && hasMultiLinkPermission.value) {
+    // 多链接且有权限，询问是否自动分配到多个输入框
+    ElMessageBox.confirm(
+      `检测到 ${extractedUrls.length} 个链接，是否自动分配到多个输入框？`,
+      '批量链接检测',
+      {
+        confirmButtonText: '自动分配',
+        cancelButtonText: '仅使用第一个',
+        type: 'info'
+      }
+    ).then(() => {
+      // 确认自动分配
+      const maxInputs = Math.min(extractedUrls.length, getMaxInputCount.value);
+      
+      // 确保有足够的输入框
+      while (videoInputUrls.value.length < maxInputs) {
+        videoInputUrls.value.push('');
+      }
+      
+      // 分配链接到输入框
+      for (let i = 0; i < maxInputs; i++) {
+        videoInputUrls.value[i] = extractedUrls[i];
+      }
+      
+      ElMessage.success(`已自动分配 ${maxInputs} 个链接到输入框`);
+    }).catch(() => {
+      // 取消，仅使用第一个链接
+      if (extractedUrls.length > 0) {
+        if (mode === 'video') {
+          videoInputUrls.value[currentIndex] = extractedUrls[0];
+        } else {
+          authorInputUrls.value[currentIndex] = extractedUrls[0];
+        }
+      }
+    });
+  } else if (extractedUrls.length > 0) {
+    // 单链接模式或没有多链接权限，使用第一个链接
+    if (mode === 'video') {
+      videoInputUrls.value[currentIndex] = extractedUrls[0];
+    } else {
+      authorInputUrls.value[currentIndex] = extractedUrls[0];
+    }
+    
+    if (extractedUrls.length > 1) {
+      ElMessage.warning(`检测到多个链接，已使用第一个。${!hasMultiLinkPermission.value ? '多链接需要升级会员' : ''}`);
+    }
+  }
+};
+
 // 获取预计完成时间
 const getEstimatedTime = () => {
   const urlCount = getAllInputUrls().length;
@@ -1118,6 +1295,7 @@ const searchCreator = async () => {
   
   // 开始数据收集过程
   loading.value = true;
+  douyinData.isLoading = true;
   
   try {
     // 1. 调用异步采集API
@@ -1189,6 +1367,7 @@ const searchCreator = async () => {
     handleWriteError(error);
   } finally {
     loading.value = false;
+    douyinData.isLoading = false;
   }
 };
 
@@ -1409,12 +1588,8 @@ onMounted(async () => {
   useMockData.value = false;
   console.log('DouyinView 组件挂载完成, 使用真实API模式');
   
-  // 检查是否有作者采集权限，没有则切换到单视频模式
-  if (!hasAuthorExtractPermission.value) {
-    extractMode.value = 'video';
-    douyinData.extractMode = 'video';
-    console.log('用户没有作者采集权限，已切换到单视频模式');
-  }
+  // 作者采集默认可用，无需权限检查
+  console.log('作者主页采集默认可用');
   
   // 检查飞书SDK是否可用
   console.log('=== 检查飞书SDK状态 ===');
@@ -1514,12 +1689,8 @@ onActivated(() => {
   console.log('提取权限状态:', hasExtractPermission.value);
   console.log('作者提取权限状态:', hasAuthorExtractPermission.value);
   
-  // 检查是否有作者采集权限，没有则显示提示
-  if (extractMode.value === 'author' && !hasAuthorExtractPermission.value) {
-    ElMessage.warning('作者模式需要批量会员权限，已为您切换到单视频模式');
-    extractMode.value = 'video';
-    douyinData.extractMode = 'video';
-  }
+  // 作者模式默认可用，无需权限检查
+  console.log('作者模式默认可用，当前模式:', mainMode.value);
 });
 
 // 切换模拟数据模式（仅开发环境可用）
@@ -1617,12 +1788,8 @@ const toggleExtractMode = (mode) => {
   douyinData.extractMode = mode;
   douyinData.error = null;
   
-  // 如果切换到作者模式，但用户没有权限
-  if (mode === 'author' && !hasAuthorExtractPermission.value) {
-    ElMessage.warning('作者模式需要会员权限，请升级后使用');
-    extractMode.value = 'video';
-    douyinData.extractMode = 'video';
-  }
+  // 作者模式默认可用，无需权限检查
+  console.log('切换到作者模式，默认可用');
 };
 
 // 重新实现滚动表格功能，使用记录选择和延迟执行的方式
@@ -2087,6 +2254,10 @@ const selectTranscriptionStrategy = (recordCount) => {
 
 // 统一错误处理函数
 const handleTranscriptionError = (error) => {
+  // 确保loading状态被重置
+  loading.value = false;
+  douyinData.isLoading = false;
+  
   if (error instanceof BusinessError) {
     // 业务错误已经在ErrorHandler中处理过了
     logger.error('业务错误', { code: error.code, message: error.message, errorInfo: error.errorInfo });
@@ -2141,6 +2312,7 @@ const searchCreatorAndTranscribe = async () => {
   
   // 开始数据收集和转写过程
   loading.value = true;
+  douyinData.isLoading = true;
   
   try {
     // ==================== 阶段一：数据采集 ====================
@@ -2202,6 +2374,8 @@ const searchCreatorAndTranscribe = async () => {
     if (videoRecords.length === 0) {
       updateProgress('completed', 100, 100, '采集完成，但没有可转写的视频');
       ElMessage.warning('没有找到可转写的视频记录');
+      loading.value = false;
+      douyinData.isLoading = false;
       return;
     }
     
@@ -2210,6 +2384,15 @@ const searchCreatorAndTranscribe = async () => {
     
     // 🚀 显示实时转写组件
     showRealtimeDisplay.value = true;
+    
+    // 🚀 等待组件渲染后开始转写状态显示
+    await nextTick();
+    if (realtimeDisplayRef.value) {
+      realtimeDisplayRef.value.startTranscribing();
+      realtimeDisplayRef.value.clearBatchAndPointsInfo(); // 清除之前的批次和积分信息
+    } else {
+      logger.warn('⚠️ 实时显示组件引用为空，无法设置转写状态');
+    }
     
     // 使用新的转写服务（支持实时显示）
     const transcriptionResults = await transcriptionService.performTranscription(
@@ -2224,9 +2407,17 @@ const searchCreatorAndTranscribe = async () => {
           const overallProgress = 70 + (progressInfo.progress * 0.25); // 70-95%
           updateProgress('transcribing', overallProgress, 100, progressInfo.message);
           
-          // 🚀 更新实时统计显示
-          if (progressInfo.realtimeStats && realtimeDisplayRef.value) {
-            // 这里可以添加额外的统计信息更新逻辑
+          // 🚀 更新批次信息和积分统计
+          if (realtimeDisplayRef.value) {
+            // 更新批次进度信息
+            if (progressInfo.batchInfo) {
+              realtimeDisplayRef.value.updateBatchInfo(progressInfo.batchInfo);
+            }
+            
+            // 更新积分统计信息
+            if (progressInfo.pointsStatistics) {
+              realtimeDisplayRef.value.updatePointsStatistics(progressInfo.pointsStatistics);
+            }
           }
         }
       },
@@ -2257,6 +2448,12 @@ const searchCreatorAndTranscribe = async () => {
     // ==================== 完成 ====================
     updateProgress('completed', 100, 100, '采集并转写完成！');
     
+    // 🚀 停止转写状态显示
+    if (realtimeDisplayRef.value) {
+      realtimeDisplayRef.value.stopTranscribing();
+      realtimeDisplayRef.value.clearBatchAndPointsInfo(); // 清除批次和积分信息
+    }
+    
     // 保存采集到的视频数据
     douyinData.videos = videos;
     
@@ -2280,9 +2477,17 @@ const searchCreatorAndTranscribe = async () => {
     // showRealtimeDisplay.value = false;
   } catch (error) {
     logger.error('采集并转写过程出错:', error);
+    
+    // 🚀 停止转写状态显示
+    if (realtimeDisplayRef.value) {
+      realtimeDisplayRef.value.stopTranscribing();
+      realtimeDisplayRef.value.clearBatchAndPointsInfo(); // 清除批次和积分信息
+    }
+    
     handleTranscriptionError(error);
   } finally {
     loading.value = false;
+    douyinData.isLoading = false;
   }
 };
 
@@ -2348,16 +2553,10 @@ const handleRealtimeResultAdded = (data) => {
       <div class="main-tab-container">
         <div 
           class="main-tab-item" 
-          :class="{ active: mainMode === 'author', disabled: !hasAuthorExtractPermission }" 
-          @click="hasAuthorExtractPermission && setMainMode('author')"
+          :class="{ active: mainMode === 'author' }" 
+          @click="setMainMode('author')"
         >
-          <el-tooltip v-if="!hasAuthorExtractPermission" content="需要高级会员权限" placement="top">
-            <div class="locked-option">
-              <!-- <el-icon><Lock /></el-icon> -->
-              作者主页采集
-            </div>
-          </el-tooltip>
-          <span v-else>作者主页采集</span>
+          <span>作者主页采集</span>
         </div>
         <div 
           class="main-tab-item" 
@@ -2387,9 +2586,18 @@ const handleRealtimeResultAdded = (data) => {
           <div v-for="(url, index) in videoInputUrls" :key="'video-'+index" class="url-input-row">
             <el-input 
               v-model="videoInputUrls[index]" 
-              placeholder="请输入抖音视频链接或ID"
+              placeholder="请输入抖音视频链接，支持自动识别"
               :disabled="douyinData.isLoading"
               class="url-input"
+              @input="(value) => handleUrlInputChange(value, index, 'video')"
+              @paste="(event) => {
+                setTimeout(() => {
+                  handleBatchUrlPaste(event.target.value, index, 'video');
+                }, 100);
+              }"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              resize="none"
             ></el-input>
             <div class="url-input-actions">
               <!-- 基础会员提示 -->
@@ -2440,9 +2648,18 @@ const handleRealtimeResultAdded = (data) => {
           <div class="url-input-row">
             <el-input 
               v-model="authorInputUrls[0]" 
-              placeholder="请输入抖音作者主页链接"
+              placeholder="请输入抖音作者主页链接，支持自动识别"
               :disabled="douyinData.isLoading"
               class="url-input"
+              @input="(value) => handleUrlInputChange(value, 0, 'author')"
+              @paste="(event) => {
+                setTimeout(() => {
+                  handleBatchUrlPaste(event.target.value, 0, 'author');
+                }, 100);
+              }"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              resize="none"
             ></el-input>
           </div>
         </div>
@@ -2940,11 +3157,34 @@ const handleRealtimeResultAdded = (data) => {
   padding: 0;
 }
 
-.member-limit-hint {
+.feature-hints {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.hint-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
   font-size: 12px;
-  color: #909399;
-  margin-top: 8px;
+  color: #606266;
   line-height: 18px;
+}
+
+.hint-item:last-child {
+  margin-bottom: 0;
+}
+
+.hint-icon {
+  margin-right: 6px;
+  font-size: 14px;
+}
+
+.hint-text {
+  flex: 1;
 }
 
 .field-select-card {

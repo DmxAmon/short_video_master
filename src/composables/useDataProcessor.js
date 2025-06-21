@@ -392,6 +392,9 @@ export function useDataProcessor() {
   const handleWriteError = (error) => {
     logger.error('处理写入错误', error);
 
+    // 重置进度状态
+    updateProgress('completed', 100, 100, '操作失败');
+
     // 根据错误类型显示不同的提示
     if (error.message.includes('SDK')) {
       ElMessage.error('飞书SDK未加载，请刷新页面重试');

@@ -20,38 +20,156 @@ export class TableUpdateService {
    */
   async getOrCreateTranscriptionField(table) {
     try {
+      // 🚀 首先尝试查找现有的转写字段
       const fieldMetaList = await table.getFieldMetaList();
       
-      // 查找转写字段
-      const transcriptionField = fieldMetaList.find(field => 
-        field.name === '视频转写内容' || 
-        field.name === 'transcription' ||
-        field.name.includes('转写')
-      );
+      // 查找转写字段（更精确的匹配）
+      const transcriptionField = fieldMetaList.find(field => {
+        const fieldName = field.name;
+        return fieldName === '视频转写内容' || 
+               fieldName === '转写内容' ||
+               fieldName === '视频转写' ||
+               fieldName === 'transcription' ||
+               fieldName === '转写文本' ||
+               fieldName.includes('转写');
+      });
       
-      if (transcriptionField) {
-        logger.info('找到转写字段', { 
+      if (transcriptionField && transcriptionField.id) {
+        logger.info('找到现有转写字段', { 
           fieldId: transcriptionField.id, 
           fieldName: transcriptionField.name 
         });
         return transcriptionField.id;
       }
       
-      // 创建新的转写字段
-      logger.info('创建新的转写字段');
-      const newField = await table.addField({
-        type: 1, // 多行文本类型
-        name: '视频转写内容'
+      // 🚀 如果没找到，尝试创建新的转写字段
+      const possibleNames = [
+        '视频转写内容',
+        '转写内容',
+        '视频转写',
+        'transcription',
+        '转写文本'
+      ];
+      
+      for (const fieldName of possibleNames) {
+        try {
+          logger.info('尝试创建转写字段', { fieldName });
+          
+          const newField = await table.addField({
+            type: 1, // 多行文本类型
+            name: fieldName
+          });
+          
+          // 🚀 验证字段ID是否有效
+          if (newField && newField.id) {
+            logger.info('转写字段创建成功', { 
+              fieldId: newField.id, 
+              fieldName: fieldName 
+            });
+            return newField.id;
+          } else {
+            logger.warn('字段创建返回无效ID，尝试重新查找', { 
+              fieldName,
+              newField 
+            });
+            
+            // 🚀 如果创建返回的ID无效，立即重新查找
+            const updatedFieldList = await table.getFieldMetaList();
+            const createdField = updatedFieldList.find(field => field.name === fieldName);
+            
+            if (createdField && createdField.id) {
+              logger.info('重新查找到刚创建的字段', { 
+                fieldId: createdField.id, 
+                fieldName: fieldName 
+              });
+              return createdField.id;
+            }
+          }
+          
+        } catch (createError) {
+          logger.warn('字段创建失败，尝试下一个名称', { 
+            fieldName, 
+            error: createError.message 
+          });
+          
+          // 🚀 如果是字段名重复错误，先检查是否该字段已存在
+          if (createError.message.includes('repeated') || 
+              createError.message.includes('duplicate') ||
+              createError.message.includes('exist')) {
+            
+            // 重新查找，可能字段已经被其他进程创建
+            const retryFieldList = await table.getFieldMetaList();
+            const existingField = retryFieldList.find(field => field.name === fieldName);
+            
+            if (existingField && existingField.id) {
+              logger.info('发现已存在的同名字段', { 
+                fieldId: existingField.id, 
+                fieldName: fieldName 
+              });
+              return existingField.id;
+            }
+            
+            // 继续尝试下一个名称
+            continue;
+          } else {
+            // 其他错误直接抛出
+            throw createError;
+          }
+        }
+      }
+      
+      // 🚀 如果所有创建尝试都失败，最后再次查找所有转写相关字段
+      logger.warn('所有字段创建尝试都失败，进行最终查找');
+      const finalFieldList = await table.getFieldMetaList();
+      const anyTranscriptionField = finalFieldList.find(field => {
+        const fieldName = field.name;
+        return fieldName === '视频转写内容' || 
+               fieldName === '转写内容' ||
+               fieldName === '视频转写' ||
+               fieldName === 'transcription' ||
+               fieldName === '转写文本' ||
+               fieldName.includes('转写');
       });
       
-      logger.info('转写字段创建成功', { 
-        fieldId: newField.id, 
-        fieldName: '视频转写内容' 
-      });
+      if (anyTranscriptionField && anyTranscriptionField.id) {
+        logger.info('最终查找到转写字段', { 
+          fieldId: anyTranscriptionField.id, 
+          fieldName: anyTranscriptionField.name 
+        });
+        return anyTranscriptionField.id;
+      }
       
-      return newField.id;
+      // 如果真的找不到，抛出错误
+      throw new Error('无法创建或找到转写字段');
+      
     } catch (error) {
       logger.error('获取或创建转写字段失败', error);
+      
+      // 🚀 最后的容错机制：再次尝试查找任何转写相关字段
+      try {
+        logger.info('执行最后的容错查找');
+        const fieldMetaList = await table.getFieldMetaList();
+        const transcriptionField = fieldMetaList.find(field => {
+          const fieldName = field.name;
+          return fieldName === '视频转写内容' || 
+                 fieldName === '转写内容' ||
+                 fieldName === '视频转写' ||
+                 fieldName === 'transcription' ||
+                 fieldName === '转写文本' ||
+                 fieldName.includes('转写');
+        });
+        
+        if (transcriptionField && transcriptionField.id) {
+          logger.info('容错查找成功', { 
+            fieldId: transcriptionField.id, 
+            fieldName: transcriptionField.name 
+          });
+          return transcriptionField.id;
+        }
+      } catch (retryError) {
+        logger.error('容错查找也失败', retryError);
+      }
+      
       throw error;
     }
   }
@@ -74,6 +192,15 @@ export class TableUpdateService {
       
       // 获取或创建转写字段
       const transcriptionFieldId = await this.getOrCreateTranscriptionField(table);
+      
+      if (!transcriptionFieldId) {
+        throw new Error('无法获取转写字段ID');
+      }
+      
+      logger.info('成功获取转写字段ID', { 
+        transcriptionFieldId, 
+        fieldIdType: typeof transcriptionFieldId 
+      });
       
       // 准备更新数据
       const updateRecords = [];
@@ -195,6 +322,15 @@ export class TableUpdateService {
       // 获取或创建转写字段
       const transcriptionFieldId = await this.getOrCreateTranscriptionField(table);
       
+      if (!transcriptionFieldId) {
+        throw new Error('无法获取转写字段ID');
+      }
+      
+      logger.info('单个记录更新 - 成功获取转写字段ID', { 
+        transcriptionFieldId, 
+        fieldIdType: typeof transcriptionFieldId 
+      });
+      
       // 更新记录
       await table.setRecord(recordId, {
         [transcriptionFieldId]: transcriptionText
@@ -219,11 +355,15 @@ export class TableUpdateService {
       const table = await bitable.base.getTableById(tableId);
       const fieldMetaList = await table.getFieldMetaList();
       
-      const transcriptionField = fieldMetaList.find(field => 
-        field.name === '视频转写内容' || 
-        field.name === 'transcription' ||
-        field.name.includes('转写')
-      );
+      const transcriptionField = fieldMetaList.find(field => {
+        const fieldName = field.name;
+        return fieldName === '视频转写内容' || 
+               fieldName === '转写内容' ||
+               fieldName === '视频转写' ||
+               fieldName === 'transcription' ||
+               fieldName === '转写文本' ||
+               fieldName.includes('转写');
+      });
       
       return !!transcriptionField;
     } catch (error) {

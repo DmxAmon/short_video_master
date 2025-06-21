@@ -178,7 +178,7 @@ export class TranscriptionService {
   }
 
   /**
-   * 轮询转写进度（支持实时显示）
+   * 轮询转写进度（支持实时显示和分批推送）
    * @param {string} taskId - 任务ID
    * @param {Function} progressCallback - 进度回调函数
    * @param {Function} realtimeCallback - 实时结果回调函数
@@ -187,8 +187,8 @@ export class TranscriptionService {
   async pollProgress(taskId, progressCallback, realtimeCallback) {
     const startTime = Date.now();
     
-    // 用于跟踪已处理的实时结果，避免重复处理
-    const processedResults = new Set();
+    // 用于跟踪已处理的结果，避免重复处理
+    let lastResultCount = 0;
     const allResults = [];
     
     return new Promise((resolve, reject) => {
@@ -202,20 +202,84 @@ export class TranscriptionService {
 
           const status = await this.checkStatus(taskId);
           
-          // 🚀 新增：处理实时转写结果
-          if (status.realtime_results && status.realtime_results.length > 0) {
-            this.processRealtimeResults(status.realtime_results, taskId, processedResults, allResults, realtimeCallback);
+          // 🚀 处理实时结果（新的分批推送格式）
+          if (status.results && status.results.length > lastResultCount) {
+            const newResults = status.results.slice(lastResultCount);
+            
+            logger.info('📝 收到新的转写结果', {
+              taskId,
+              newCount: newResults.length,
+              totalCount: status.results.length,
+              lastResultCount
+            });
+            
+            // 处理新结果
+            newResults.forEach(result => {
+              allResults.push(result);
+              
+              // 调用实时回调显示新结果
+              if (realtimeCallback) {
+                realtimeCallback({
+                  type: 'transcription_item_complete',
+                  result: result,
+                  progress: {
+                    completed: status.completed_count || 0,
+                    total: status.total_count || 0
+                  },
+                  isFinal: false
+                });
+              }
+            });
+            
+            lastResultCount = status.results.length;
           }
           
-          // 调用进度回调
+          // 🚀 处理传统的实时结果（兼容性）
+          if (status.realtime_results && status.realtime_results.length > 0) {
+            status.realtime_results.forEach(item => {
+              if (item.type === 'transcription_item_complete') {
+                const result = item.result;
+                
+                // 检查是否已存在（避免重复）
+                const existingIndex = allResults.findIndex(r => r.record_id === result.record_id);
+                if (existingIndex === -1) {
+                  allResults.push(result);
+                  
+                  if (realtimeCallback) {
+                    realtimeCallback({
+                      type: 'transcription_item_complete',
+                      result: result,
+                      progress: item.progress,
+                      isFinal: false
+                    });
+                  }
+                }
+              }
+            });
+          }
+          
+          // 调用进度回调（支持新的批次信息）
           if (progressCallback) {
+            let progressMessage = status.message || `正在转写 ${status.completed_count || 0}/${status.total_count || 0} 个视频...`;
+            
+            // 🚀 支持批次进度信息
+            if (status.batch_info) {
+              progressMessage = `正在转写第${status.batch_info.current_batch}/${status.batch_info.total_batches}批 (${status.completed_count || 0}/${status.total_count || 0}) - ${status.progress || 0}%`;
+            }
+            
             progressCallback({
               stage: 'processing',
               progress: status.progress || 0,
-              message: status.message || `正在转写 ${status.completed_count || 0}/${status.total_count || 0} 个视频...`,
+              message: progressMessage,
               completedCount: status.completed_count || 0,
               totalCount: status.total_count || 0,
-              // 🚀 新增：实时统计信息
+              failedCount: status.failed_count || 0,
+              fallbackCount: status.fallback_count || 0,
+              // 🚀 新增：批次信息
+              batchInfo: status.batch_info,
+              // 🚀 新增：积分统计
+              pointsStatistics: status.points_statistics,
+              // 🚀 实时统计信息（基于当前已收到的结果）
               realtimeStats: {
                 processedCount: allResults.length,
                 successCount: allResults.filter(r => r.status === 'completed' && !r.is_fallback).length,
@@ -226,43 +290,66 @@ export class TranscriptionService {
           }
 
           if (status.status === 'completed') {
-            // 转写完成，获取最终结果（可能包含遗漏的结果）
-            logger.info('🎉 转写任务完成，检查最终结果', { 
+            // 转写完成，确保获取所有结果
+            logger.info('🎉 转写任务完成', { 
               taskId, 
-              realtimeResultsCount: allResults.length,
-              expectedCount: status.total_count 
+              currentResultsCount: allResults.length,
+              expectedCount: status.total_count,
+              statusResultsCount: status.results?.length || 0
             });
             
-            // 如果实时结果数量少于预期，获取完整结果
-            if (allResults.length < status.total_count) {
-              const finalResults = await this.getResults(taskId);
-              
-              // 处理可能遗漏的结果
-              finalResults.forEach(result => {
-                const resultKey = `${taskId}_${result.record_id}`;
-                if (!processedResults.has(resultKey)) {
-                  logger.info('📝 处理遗漏的最终结果', { recordId: result.record_id });
-                  allResults.push(result);
-                  
-                  // 调用实时回调显示遗漏的结果
-                  if (realtimeCallback) {
-                    realtimeCallback({
-                      type: 'transcription_item_complete',
-                      result: result,
-                      progress: {
-                        completed: status.completed_count,
-                        total: status.total_count
-                      },
-                      isFinal: true
-                    });
-                  }
+            // 如果状态中的结果比当前收集的多，补充遗漏的结果
+            if (status.results && status.results.length > allResults.length) {
+              const missingResults = status.results.slice(allResults.length);
+              missingResults.forEach(result => {
+                allResults.push(result);
+                if (realtimeCallback) {
+                  realtimeCallback({
+                    type: 'transcription_item_complete',
+                    result: result,
+                    progress: {
+                      completed: status.completed_count,
+                      total: status.total_count
+                    },
+                    isFinal: true
+                  });
                 }
               });
             }
             
+            // 如果还是缺少结果，尝试从结果接口获取
+            if (allResults.length < status.total_count) {
+              try {
+                const finalResults = await this.getResults(taskId);
+                
+                // 补充遗漏的结果
+                finalResults.forEach(result => {
+                  const existingIndex = allResults.findIndex(r => r.record_id === result.record_id);
+                  if (existingIndex === -1) {
+                    logger.info('📝 补充遗漏的最终结果', { recordId: result.record_id });
+                    allResults.push(result);
+                    
+                    if (realtimeCallback) {
+                      realtimeCallback({
+                        type: 'transcription_item_complete',
+                        result: result,
+                        progress: {
+                          completed: status.completed_count,
+                          total: status.total_count
+                        },
+                        isFinal: true
+                      });
+                    }
+                  }
+                });
+              } catch (error) {
+                logger.warn('⚠️ 获取最终结果失败，使用当前结果', { error: error.message });
+              }
+            }
+            
             resolve(allResults);
           } else if (status.status === 'failed') {
-            reject(new Error(status.error || '转写任务失败'));
+            reject(new Error(status.error || status.message || '转写任务失败'));
           } else if (status.status === 'insufficient_points') {
             // 积分不足，返回已完成的部分结果
             logger.warn('💰 积分不足，转写任务中断', { 
@@ -282,61 +369,6 @@ export class TranscriptionService {
 
       // 开始轮询
       poll();
-    });
-  }
-
-  /**
-   * 🚀 新增：处理实时转写结果
-   * @param {Array} realtimeResults - 实时结果数组
-   * @param {string} taskId - 任务ID
-   * @param {Set} processedResults - 已处理结果集合
-   * @param {Array} allResults - 所有结果数组
-   * @param {Function} realtimeCallback - 实时回调函数
-   */
-  processRealtimeResults(realtimeResults, taskId, processedResults, allResults, realtimeCallback) {
-    realtimeResults.forEach(item => {
-      if (item.type === 'transcription_item_complete') {
-        const result = item.result;
-        const resultKey = `${taskId}_${result.record_id}`;
-        
-        // 避免重复处理
-        if (processedResults.has(resultKey)) {
-          return;
-        }
-        processedResults.add(resultKey);
-        
-        // 添加到结果数组
-        allResults.push(result);
-        
-        // 记录日志
-        if (result.is_fallback) {
-          logger.info('📝 智能分析完成', {
-            recordId: result.record_id,
-            textPreview: result.transcription_text?.substring(0, 50) + '...',
-            wordCount: result.word_count,
-            confidence: result.confidence,
-            progress: item.progress
-          });
-        } else {
-          logger.info('✅ 实时转写完成', {
-            recordId: result.record_id,
-            textPreview: result.transcription_text?.substring(0, 50) + '...',
-            wordCount: result.word_count,
-            confidence: result.confidence,
-            progress: item.progress
-          });
-        }
-        
-        // 调用实时回调
-        if (realtimeCallback) {
-          realtimeCallback({
-            type: 'transcription_item_complete',
-            result: result,
-            progress: item.progress,
-            isFinal: false
-          });
-        }
-      }
     });
   }
 
