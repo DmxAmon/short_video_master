@@ -9,7 +9,7 @@ import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import axios from 'axios';
 import InfoCard from '../components/common/InfoCard.vue';
-import { ArrowDown, Plus, Delete, Lock, Loading, Check, SuccessFilled } from '@element-plus/icons-vue';
+import { ArrowDown, Plus, Delete, Lock, Loading, Check, SuccessFilled, Document, Microphone, Refresh } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import { bitable } from '@lark-base-open/js-sdk';
 // 只导入需要的函数
@@ -1589,6 +1589,28 @@ const getSelectedFields = () => {
   return Object.values(fields).filter(field => field.selected);
 };
 
+// 获取进度条标题
+const getProgressTitle = () => {
+  switch (writeProgress.stage) {
+    case 'preparing':
+      return '准备中';
+    case 'collecting':
+      return '采集中';
+    case 'processing':
+      return '采集中';
+    case 'writing':
+      return '写入表格中';
+    case 'transcribing':
+      return '转写中';
+    case 'updating':
+      return '更新结果中';
+    case 'completed':
+      return '完成';
+    default:
+      return '处理中';
+  }
+};
+
 // 切换提取模式
 const toggleExtractMode = (mode) => {
   extractMode.value = mode;
@@ -2573,14 +2595,15 @@ const handleRealtimeResultAdded = (data) => {
           <div class="progress-header">
             <div class="progress-icon">
               <el-icon v-if="writeProgress.stage === 'preparing'" class="is-loading"><Loading /></el-icon>
-              <el-icon v-else-if="writeProgress.stage === 'processing'" class="is-loading"><Loading /></el-icon>
+              <el-icon v-else-if="writeProgress.stage === 'collecting' || writeProgress.stage === 'processing'" class="is-loading"><Loading /></el-icon>
+              <el-icon v-else-if="writeProgress.stage === 'writing'" class="is-loading"><Document /></el-icon>
+              <el-icon v-else-if="writeProgress.stage === 'transcribing'" class="is-loading"><Microphone /></el-icon>
+              <el-icon v-else-if="writeProgress.stage === 'updating'" class="is-loading"><Refresh /></el-icon>
               <el-icon v-else-if="writeProgress.stage === 'completed'"><Check /></el-icon>
-              <el-icon v-else><Loading /></el-icon>
+              <el-icon v-else class="is-loading"><Loading /></el-icon>
             </div>
             <div class="progress-title">
-              {{ writeProgress.stage === 'preparing' ? '准备中' : 
-                 writeProgress.stage === 'processing' ? '采集中' : 
-                 writeProgress.stage === 'completed' ? '完成' : '处理中' }}
+              {{ getProgressTitle() }}
             </div>
           </div>
           
@@ -2594,9 +2617,11 @@ const handleRealtimeResultAdded = (data) => {
             {{ writeProgress.message }}
           </div>
           
-          <div v-if="writeProgress.stage === 'processing'" class="progress-tips">
-            <p>💡 采集大量数据需要时间，请耐心等待</p>
-            <p>📊 系统正在后台处理，您可以继续其他操作</p>
+          <div v-if="writeProgress.stage === 'processing' || writeProgress.stage === 'transcribing'" class="progress-tips">
+            <p v-if="writeProgress.stage === 'processing'">💡 采集大量数据需要时间，请耐心等待</p>
+            <p v-if="writeProgress.stage === 'processing'">📊 系统正在后台处理，您可以继续其他操作</p>
+            <p v-if="writeProgress.stage === 'transcribing'">🎙️ 正在进行视频转写，处理时间取决于视频数量和时长</p>
+            <p v-if="writeProgress.stage === 'transcribing'">⏱️ 请保持页面开启，转写完成后会自动更新到表格</p>
           </div>
         </div>
       </div>
