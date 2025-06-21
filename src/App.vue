@@ -379,7 +379,7 @@ const refreshUserInfo = async () => {
       <!-- 顶部通用结构（所有页面保持一致） -->
       <!-- 1. 合并后的插件名称和用户状态区 -->
       <el-tooltip content="会员中心" placement="bottom" :show-after="500">
-        <div class="plugin-header" @click="openMembershipCenter">
+      <div class="plugin-header" @click="openMembershipCenter">
           <div class="title-section">
             <h1 class="plugin-title" style="font-size: 35px;">
               <img src="/short_video_master_shiliang.ico" alt="短视频通吃" class="title-icon" />
@@ -387,14 +387,14 @@ const refreshUserInfo = async () => {
             </h1>
             <div v-if="displayUserId" class="user-id">ID：{{ displayUserId }}</div>
           </div>
-          <div class="user-info-compact" style="margin-right: 0px;">
+        <div class="user-info-compact" style="margin-right: 0px;">
             <div v-if="isUserDataLoaded && user.points !== null" class="user-points">{{ user.points }} 积分</div>
             <div v-if="isUserDataLoaded && memberLevelName" class="user-membership" :style="{ color: memberLevelColor }">
-              {{ memberLevelName }}
+            {{ memberLevelName }}
               <span v-if="user.memberLevel !== 'free' && formattedExpireDate">
-                ({{ formattedExpireDate }})
-              </span>
-              <span v-if="isExpiringSoon" class="expire-soon">即将到期</span>
+              ({{ formattedExpireDate }})
+            </span>
+            <span v-if="isExpiringSoon" class="expire-soon">即将到期</span>
             </div>
             <!-- 数据加载中的占位符 -->
             <div v-if="!isUserDataLoaded" class="loading-placeholder">

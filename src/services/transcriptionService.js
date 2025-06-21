@@ -13,6 +13,7 @@ export class TranscriptionService {
     this.baseUrl = localStorage.getItem('api_base_url') || 'https://fsbk.dy2bcsm.cn';
     this.pollingInterval = 3000; // 3秒轮询间隔
     this.maxPollingTime = 10 * 60 * 1000; // 10分钟最大轮询时间
+    this.currentTaskId = null; // 🚀 当前正在处理的任务ID
   }
 
   /**
@@ -70,6 +71,7 @@ export class TranscriptionService {
       // ✅ 正确的解析逻辑
       if (response.data.code === 0 && response.data.data && response.data.data.task_id) {
         const taskId = response.data.data.task_id;
+        this.currentTaskId = taskId; // 🚀 保存当前任务ID
         logger.info('✅ 成功获取任务ID', { taskId });
         
         // 返回正确的数据结构
@@ -291,6 +293,7 @@ export class TranscriptionService {
 
           if (status.status === 'completed') {
             // 转写完成，确保获取所有结果
+            this.currentTaskId = null; // 🚀 清空当前任务ID
             logger.info('🎉 转写任务完成', { 
               taskId, 
               currentResultsCount: allResults.length,
@@ -320,28 +323,28 @@ export class TranscriptionService {
             // 如果还是缺少结果，尝试从结果接口获取
             if (allResults.length < status.total_count) {
               try {
-                const finalResults = await this.getResults(taskId);
-                
+              const finalResults = await this.getResults(taskId);
+              
                 // 补充遗漏的结果
-                finalResults.forEach(result => {
+              finalResults.forEach(result => {
                   const existingIndex = allResults.findIndex(r => r.record_id === result.record_id);
                   if (existingIndex === -1) {
                     logger.info('📝 补充遗漏的最终结果', { recordId: result.record_id });
-                    allResults.push(result);
-                    
-                    if (realtimeCallback) {
-                      realtimeCallback({
-                        type: 'transcription_item_complete',
-                        result: result,
-                        progress: {
-                          completed: status.completed_count,
-                          total: status.total_count
-                        },
-                        isFinal: true
-                      });
-                    }
+                  allResults.push(result);
+                  
+                  if (realtimeCallback) {
+                    realtimeCallback({
+                      type: 'transcription_item_complete',
+                      result: result,
+                      progress: {
+                        completed: status.completed_count,
+                        total: status.total_count
+                      },
+                      isFinal: true
+                    });
                   }
-                });
+                }
+              });
               } catch (error) {
                 logger.warn('⚠️ 获取最终结果失败，使用当前结果', { error: error.message });
               }
@@ -349,9 +352,11 @@ export class TranscriptionService {
             
             resolve(allResults);
           } else if (status.status === 'failed') {
+            this.currentTaskId = null; // 🚀 清空当前任务ID
             reject(new Error(status.error || status.message || '转写任务失败'));
           } else if (status.status === 'insufficient_points') {
             // 积分不足，返回已完成的部分结果
+            this.currentTaskId = null; // 🚀 清空当前任务ID
             logger.warn('💰 积分不足，转写任务中断', { 
               taskId, 
               completedResults: allResults.length 
@@ -362,6 +367,7 @@ export class TranscriptionService {
             setTimeout(poll, this.pollingInterval);
           }
         } catch (error) {
+          this.currentTaskId = null; // 🚀 清空当前任务ID
           logger.error('🚨 轮询转写进度失败', { taskId, error });
           reject(error);
         }
@@ -378,7 +384,7 @@ export class TranscriptionService {
    * @param {Object} options - 转写选项
    * @param {Function} progressCallback - 进度回调函数
    * @param {Function} realtimeCallback - 实时结果回调函数
-   * @returns {Promise<Array>} 转写结果
+   * @returns {Promise<Object>} { taskId, results } - 任务ID和转写结果
    */
   async performTranscription(videoRecords, options = {}, progressCallback, realtimeCallback) {
     try {
@@ -405,7 +411,11 @@ export class TranscriptionService {
         failedCount: results.filter(r => r.status === 'failed').length
       });
 
-      return results;
+      // 🚀 返回任务ID和结果
+      return {
+        taskId: taskInfo.task_id,
+        results: results
+      };
     } catch (error) {
       logger.error('🚨 转写流程失败', error);
       throw error;

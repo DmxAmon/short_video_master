@@ -55,15 +55,15 @@ export class TableUpdateService {
         try {
           logger.info('尝试创建转写字段', { fieldName });
           
-          const newField = await table.addField({
-            type: 1, // 多行文本类型
+      const newField = await table.addField({
+        type: 1, // 多行文本类型
             name: fieldName
-          });
-          
+      });
+      
           // 🚀 验证字段ID是否有效
           if (newField && newField.id) {
-            logger.info('转写字段创建成功', { 
-              fieldId: newField.id, 
+      logger.info('转写字段创建成功', { 
+        fieldId: newField.id, 
               fieldName: fieldName 
             });
             return newField.id;

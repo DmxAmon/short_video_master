@@ -7,6 +7,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onActivated, watch, nextTick } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { onBeforeRouteLeave } from 'vue-router';
 import axios from 'axios';
 import InfoCard from '../components/common/InfoCard.vue';
 import { ArrowDown, Plus, Delete, Lock, Loading, Check, SuccessFilled, Document, Microphone, Refresh } from '@element-plus/icons-vue';
@@ -533,6 +534,213 @@ const emit = defineEmits(['data-collected', 'transcribe-selected', 'open-members
 // 🚀 实时转写显示相关
 const showRealtimeDisplay = ref(false);
 const realtimeDisplayRef = ref(null);
+
+// 🚀 转写状态管理（用于路由守卫）
+const isTranscribing = ref(false);
+
+// 🚀 当前转写任务ID（用于状态恢复）
+const currentTranscriptionTaskId = ref(null);
+
+// 🚀 状态恢复函数：检查是否有正在进行的转写任务
+const checkAndRestoreTranscriptionState = async () => {
+  // 如果没有保存的任务ID，直接返回
+  if (!currentTranscriptionTaskId.value) {
+    return;
+  }
+  
+  try {
+    logger.info('🔍 检查转写任务状态', { taskId: currentTranscriptionTaskId.value });
+    
+    // 检查任务状态
+    const status = await transcriptionService.checkStatus(currentTranscriptionTaskId.value);
+    
+    if (status.status === 'processing' || status.status === 'pending') {
+      // 任务仍在进行中，恢复转写状态
+      logger.info('🔄 恢复转写状态', { taskId: currentTranscriptionTaskId.value });
+      
+      isTranscribing.value = true;
+      showRealtimeDisplay.value = true;
+      
+      // 等待组件渲染后恢复转写状态显示
+      await nextTick();
+      
+      // 多次尝试获取组件引用，确保组件已渲染 - 增强版本
+      let retryCount = 0;
+      const maxRetries = 10; // 增加重试次数
+      
+      while (!realtimeDisplayRef.value && retryCount < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 200)); // 增加等待时间
+        retryCount++;
+        logger.info(`⏳ 等待实时显示组件渲染，尝试 ${retryCount}/${maxRetries}`, {
+          showRealtimeDisplay: showRealtimeDisplay.value,
+          mainMode: mainMode.value
+        });
+        
+        // 强制触发响应式更新
+        if (retryCount === 3 && !realtimeDisplayRef.value) {
+          logger.info('🔄 强制更新显示状态');
+          showRealtimeDisplay.value = false;
+          await nextTick();
+          showRealtimeDisplay.value = true;
+          await nextTick();
+        }
+      }
+      
+      if (realtimeDisplayRef.value) {
+        realtimeDisplayRef.value.startTranscribing();
+        logger.info('✅ 转写状态显示已恢复');
+        
+        // 继续轮询任务状态
+        continuePollingAfterRestore();
+      } else {
+        logger.warn('⚠️ 无法获取实时显示组件引用，转写状态恢复失败');
+        logger.info('📊 当前状态调试信息', {
+          showRealtimeDisplay: showRealtimeDisplay.value,
+          isTranscribing: isTranscribing.value,
+          mainMode: mainMode.value,
+          currentTaskId: currentTranscriptionTaskId.value
+        });
+        
+        // 即使组件引用失败，也要继续轮询，确保任务能完成
+        continuePollingAfterRestore();
+      }
+      
+    } else if (status.status === 'completed' || status.status === 'failed') {
+      // 任务已完成，清除状态
+      logger.info('🏁 转写任务已完成，清除状态', { 
+        taskId: currentTranscriptionTaskId.value,
+        status: status.status 
+      });
+      
+      isTranscribing.value = false;
+      currentTranscriptionTaskId.value = null;
+    }
+    
+  } catch (error) {
+    logger.error('❌ 检查转写状态失败', error);
+    
+    // 🚀 不要立即清除状态，可能只是网络问题
+    // 如果有任务ID，说明可能转写还在进行中，保持状态但不显示UI
+    if (currentTranscriptionTaskId.value) {
+      logger.warn('⚠️ 状态检查失败但保留任务ID，继续监控', { 
+        taskId: currentTranscriptionTaskId.value,
+        errorMessage: error.message 
+      });
+      
+      // 设置转写状态但不显示UI（避免错误状态）
+      isTranscribing.value = true;
+      showRealtimeDisplay.value = false;
+      
+      // 延迟重试状态检查
+      setTimeout(async () => {
+        logger.info('🔄 延迟重试状态检查', { taskId: currentTranscriptionTaskId.value });
+        await checkAndRestoreTranscriptionState();
+      }, 5000); // 5秒后重试
+      
+    } else {
+      // 没有任务ID，确实应该清除状态
+      isTranscribing.value = false;
+      currentTranscriptionTaskId.value = null;
+    }
+  }
+};
+
+// 🚀 恢复后继续轮询任务状态
+const continuePollingAfterRestore = async () => {
+  if (!currentTranscriptionTaskId.value) return;
+  
+  try {
+    // 继续轮询，但不重新启动任务
+    await transcriptionService.pollProgress(
+      currentTranscriptionTaskId.value,
+      (progressInfo) => {
+        // 转写进度回调
+        if (progressInfo.stage === 'processing' && progressInfo.progress) {
+          const overallProgress = 70 + (progressInfo.progress * 0.25); // 70-95%
+          
+          // 🚀 更新批次信息和积分统计
+          if (realtimeDisplayRef.value) {
+            // 更新批次进度信息
+            if (progressInfo.batchInfo) {
+              realtimeDisplayRef.value.updateBatchInfo(progressInfo.batchInfo);
+            }
+            
+            // 更新积分统计信息
+            if (progressInfo.pointsStatistics) {
+              realtimeDisplayRef.value.updatePointsStatistics(progressInfo.pointsStatistics);
+            }
+          }
+        }
+      },
+      (realtimeData) => {
+        // 🚀 实时转写结果回调
+        if (realtimeDisplayRef.value) {
+          realtimeDisplayRef.value.addRealtimeResult(realtimeData);
+        }
+        
+        logger.info('🎯 恢复后收到实时转写结果', {
+          recordId: realtimeData.result?.record_id,
+          isFinal: realtimeData.isFinal,
+          progress: realtimeData.progress
+        });
+      }
+    );
+    
+    // 轮询完成，重置状态
+    isTranscribing.value = false;
+    currentTranscriptionTaskId.value = null;
+    
+    // 停止转写状态显示
+    if (realtimeDisplayRef.value) {
+      realtimeDisplayRef.value.stopTranscribing();
+      realtimeDisplayRef.value.clearBatchAndPointsInfo();
+    }
+    
+    logger.info('🎉 恢复的转写任务已完成');
+    
+  } catch (error) {
+    logger.error('❌ 恢复轮询失败', error);
+    
+    // 重置状态
+    isTranscribing.value = false;
+    currentTranscriptionTaskId.value = null;
+    
+    if (realtimeDisplayRef.value) {
+      realtimeDisplayRef.value.stopTranscribing();
+      realtimeDisplayRef.value.clearBatchAndPointsInfo();
+    }
+  }
+};
+
+// 🚀 监听主模式变化，从内容预览切换回采集模式时恢复转写状态
+watch(mainMode, async (newMode, oldMode) => {
+  // 只在从内容预览模式切换回采集模式时恢复状态
+  if (oldMode === 'content' && (newMode === 'video' || newMode === 'author')) {
+    logger.info('🔄 从内容预览切换回采集模式，检查转写状态恢复', { 
+      oldMode, 
+      newMode, 
+      hasTaskId: !!currentTranscriptionTaskId.value 
+    });
+    
+    // 等待下一个tick确保组件渲染完成
+    await nextTick();
+    
+    // 🚀 增强的状态恢复：即使没有任务ID，也要检查是否有正在进行的转写
+    if (!currentTranscriptionTaskId.value) {
+      logger.info('🔍 没有保存的任务ID，检查是否有正在进行的转写任务');
+      
+      // 尝试从转写服务的轮询状态中恢复
+      if (transcriptionService && transcriptionService.currentTaskId) {
+        logger.info('🔄 从转写服务中发现任务ID，尝试恢复', { 
+          serviceTaskId: transcriptionService.currentTaskId 
+        });
+        currentTranscriptionTaskId.value = transcriptionService.currentTaskId;
+      }
+    }
+    
+    await checkAndRestoreTranscriptionState();
+  }
+});
 
 // 是否有提取权限
 const hasExtractPermission = computed(() => {
@@ -1683,7 +1891,7 @@ onMounted(async () => {
 });
 
 // 组件激活时的处理
-onActivated(() => {
+onActivated(async () => {
   console.log('DouyinView 组件被激活');
   console.log('用户权限:', props.user.permissions);
   console.log('提取权限状态:', hasExtractPermission.value);
@@ -1691,6 +1899,21 @@ onActivated(() => {
   
   // 作者模式默认可用，无需权限检查
   console.log('作者模式默认可用，当前模式:', mainMode.value);
+  
+  // 🚀 检查并恢复转写状态 - 增强版本，处理从会员页面返回的情况
+  logger.info('🔄 组件激活，检查转写状态恢复', { 
+    currentTaskId: currentTranscriptionTaskId.value,
+    isTranscribing: isTranscribing.value,
+    mainMode: mainMode.value
+  });
+  
+  // 等待组件完全渲染
+  await nextTick();
+  
+  // 延迟一点时间确保组件稳定
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  await checkAndRestoreTranscriptionState();
 });
 
 // 切换模拟数据模式（仅开发环境可用）
@@ -2385,6 +2608,9 @@ const searchCreatorAndTranscribe = async () => {
     // 🚀 显示实时转写组件
     showRealtimeDisplay.value = true;
     
+    // 🚀 设置转写状态（用于路由守卫）
+    isTranscribing.value = true;
+    
     // 🚀 等待组件渲染后开始转写状态显示
     await nextTick();
     if (realtimeDisplayRef.value) {
@@ -2395,7 +2621,7 @@ const searchCreatorAndTranscribe = async () => {
     }
     
     // 使用新的转写服务（支持实时显示）
-    const transcriptionResults = await transcriptionService.performTranscription(
+    const transcriptionResponse = await transcriptionService.performTranscription(
       videoRecords,
       {
         strategy: videoRecords.length <= 10 ? 'batch' : 'sequential',
@@ -2435,6 +2661,10 @@ const searchCreatorAndTranscribe = async () => {
       }
     );
     
+    // 🚀 保存任务ID和获取结果
+    currentTranscriptionTaskId.value = transcriptionResponse.taskId;
+    const transcriptionResults = transcriptionResponse.results;
+    
     // ==================== 阶段五：更新表格 ====================
     updateProgress('updating', 95, 100, '正在更新转写结果到表格...');
     
@@ -2453,6 +2683,10 @@ const searchCreatorAndTranscribe = async () => {
       realtimeDisplayRef.value.stopTranscribing();
       realtimeDisplayRef.value.clearBatchAndPointsInfo(); // 清除批次和积分信息
     }
+    
+    // 🚀 重置转写状态（用于路由守卫）
+    isTranscribing.value = false;
+    currentTranscriptionTaskId.value = null;
     
     // 保存采集到的视频数据
     douyinData.videos = videos;
@@ -2483,6 +2717,10 @@ const searchCreatorAndTranscribe = async () => {
       realtimeDisplayRef.value.stopTranscribing();
       realtimeDisplayRef.value.clearBatchAndPointsInfo(); // 清除批次和积分信息
     }
+    
+    // 🚀 重置转写状态（用于路由守卫）
+    isTranscribing.value = false;
+    currentTranscriptionTaskId.value = null;
     
     handleTranscriptionError(error);
   } finally {
@@ -2544,6 +2782,33 @@ const handleRealtimeResultAdded = (data) => {
   // 可以在这里添加额外的处理逻辑
   // 比如更新本地缓存、发送统计信息等
 };
+
+// 🚀 路由守卫：防止转写过程中离开页面
+onBeforeRouteLeave((to, from, next) => {
+  if (isTranscribing.value) {
+    // 转写正在进行中，显示提示并阻止离开
+    ElMessageBox.alert(
+      '转写正在进行中，请不要离开该页面！您可以打开其他app，将飞书切换到后台即可。',
+      '转写进行中',
+      {
+        confirmButtonText: '我知道了',
+        type: 'warning',
+        showClose: false,
+        closeOnClickModal: false,
+        closeOnPressEscape: false
+      }
+    ).then(() => {
+      // 用户点击确认后，不允许离开页面
+      logger.info('🚫 用户尝试在转写过程中离开页面，已阻止');
+    });
+    
+    // 阻止路由切换
+    next(false);
+  } else {
+    // 转写未进行，允许正常切换
+    next();
+  }
+});
 </script>
 
 <template>

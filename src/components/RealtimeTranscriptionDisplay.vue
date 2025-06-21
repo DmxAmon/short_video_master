@@ -17,7 +17,7 @@
     <div class="transcription-status" v-if="showStats && isTranscribing">
       <div class="status-item transcribing">
         <span class="transcribing-icon">🎙️</span>
-        <span class="transcribing-text">正在转写，请不要切换页面</span>
+        <span class="transcribing-text">正在批量转写中，请不要切换页面</span>
         <span class="transcribing-dots">
           <span class="dot"></span>
           <span class="dot"></span>
