@@ -16,7 +16,7 @@ const LOG_LEVELS = {
 // 🎛️ 日志控制开关配置
 const LOG_CONFIG = {
   // 是否启用日志输出（总开关）
-  enabled: true,
+  enabled: false,
   
   // 自定义日志级别（如果设置，会覆盖环境自动判断）
   // 可选值：'ERROR', 'WARN', 'INFO', 'DEBUG', 'OFF'
