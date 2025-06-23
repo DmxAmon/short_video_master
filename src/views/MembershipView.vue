@@ -410,23 +410,60 @@ watch(membershipLevels, () => {
 }, { deep: true });
 
 onMounted(async () => {
-  // 🎯 启动价格计数动画
+  console.log('会员等级数据:', membershipLevels.value);
+  
+  // 🎯 启动价格闪烁效果
   startPriceAnimation();
   
-  // 默认显示专业会员页面，引导用户充值
-  activeTier.value = 'professional';
+  // 全局token过期处理标志，确保只处理一次
+  let isTokenExpiredHandled = false;
   
-  let hasTokenError = false; // 标记是否遇到token错误
+  // 处理token过期的统一函数
+  const handleTokenExpired = () => {
+    if (isTokenExpiredHandled) {
+      return; // 已经处理过了，不重复处理
+    }
+    isTokenExpiredHandled = true;
+    
+    console.log('检测到token过期，开始统一处理');
+    
+    // 显示友好的提示信息
+    ElMessage.warning({
+      message: '登录状态已过期，正在重新获取认证信息...',
+      duration: 3000
+    });
+    
+    // 清除过期的认证信息
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_info');
+    localStorage.removeItem('token_expires_at');
+    
+    // 延迟刷新插件，让用户看到提示信息
+    setTimeout(() => {
+      console.log('开始重新认证流程...');
+      // 刷新整个插件页面以重新获取token
+      window.location.reload();
+    }, 2000);
+  };
   
-  // 获取会员等级列表和价格信息
+  // 检查错误是否为token过期
+  const isTokenExpiredError = (error) => {
+    return error.message && (
+      error.message.includes('Token') || 
+      error.message.includes('登录') || 
+      error.message.includes('过期')
+    );
+  };
+  
+  // 获取会员等级列表
   try {
     const response = await getMembershipLevelsNew();
-    if (response && response.data && response.data.levels) {
-      membershipLevels.value = response.data.levels;
-      console.log('会员等级数据:', membershipLevels.value);
+    if (response && response.data) {
+      membershipLevels.value = response.data;
       
-      // 专门查找专业会员并打印信息
-      const professionalMember = response.data.levels.find(level => 
+      // 查找专业会员等级
+      const professionalMember = membershipLevels.value.find(level => 
         level.name === '专业会员' || level.id === 11
       );
       console.log('找到的专业会员:', professionalMember);
@@ -438,29 +475,8 @@ onMounted(async () => {
     console.error('获取会员等级失败:', error);
     
     // 检查是否为token过期错误
-    if (error.message && (error.message.includes('Token') || error.message.includes('登录') || error.message.includes('过期'))) {
-      hasTokenError = true;
-      console.log('检测到token过期，停止后续API调用');
-      
-      // 显示友好的提示信息
-      ElMessage.warning({
-        message: '登录状态已过期，正在重新获取认证信息...',
-        duration: 3000
-      });
-      
-      // 清除过期的认证信息
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user_info');
-      localStorage.removeItem('token_expires_at');
-      
-      // 延迟刷新插件，让用户看到提示信息
-      setTimeout(() => {
-        console.log('开始重新认证流程...');
-        // 刷新整个插件页面以重新获取token
-        window.location.reload();
-      }, 2000);
-      
+    if (isTokenExpiredError(error)) {
+      handleTokenExpired();
       return; // 立即停止执行
     }
     
@@ -498,8 +514,8 @@ onMounted(async () => {
     }, 1500);
   }
   
-  // 如果前面已经检测到token错误，停止后续API调用
-  if (hasTokenError) {
+  // 如果已经处理了token过期，停止后续API调用
+  if (isTokenExpiredHandled) {
     return;
   }
   
@@ -545,34 +561,14 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('获取积分消费记录失败:', error);
-    // 检查是否为token过期错误，如果是则不设置模拟数据
-    if (error.message && (error.message.includes('Token') || error.message.includes('登录') || error.message.includes('过期'))) {
+    
+    // 检查是否为token过期错误
+    if (isTokenExpiredError(error)) {
       console.log('积分消费API也检测到token过期');
-      
-      // 如果前面还没有处理过token过期，在这里也处理
-      if (!hasTokenError) {
-        // 显示友好的提示信息
-        ElMessage.warning({
-          message: '登录状态已过期，正在重新获取认证信息...',
-          duration: 3000
-        });
-        
-        // 清除过期的认证信息
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_info');
-        localStorage.removeItem('token_expires_at');
-        
-        // 延迟刷新插件，让用户看到提示信息
-        setTimeout(() => {
-          console.log('开始重新认证流程...');
-          // 刷新整个插件页面以重新获取token
-          window.location.reload();
-        }, 2000);
-      }
-      
+      handleTokenExpired();
       return;
     }
+    
     // 设置模拟数据
     monthlyPointsUsed.value = 12680;
   }
