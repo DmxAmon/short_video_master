@@ -451,10 +451,18 @@ onMounted(async () => {
   
   // 检查错误是否为token过期
   const isTokenExpiredError = (error) => {
+    // 检查HTTP状态码401
+    if (error.response && error.response.status === 401) {
+      return true;
+    }
+    
+    // 检查错误信息中的关键词
     return error.message && (
       error.message.includes('Token') || 
       error.message.includes('登录') || 
-      error.message.includes('过期')
+      error.message.includes('过期') ||
+      error.message.includes('Unauthorized') ||
+      error.message.includes('401')
     );
   };
   
@@ -471,7 +479,7 @@ onMounted(async () => {
       const professionalMember = membershipLevels.value.find(level => 
         level.name === '专业会员' || level.id === 11
       );
-      console.log('🎯 找到的专业会员:', professionalMember);
+      console.log('找到的专业会员:', professionalMember);
       
       // 🎯 检查价格是否已加载
       checkPriceLoaded();
@@ -523,14 +531,19 @@ onMounted(async () => {
   
   // 如果已经处理了token过期，停止后续API调用
   if (isTokenExpiredHandled) {
+    console.log('⚠️ Token过期已处理，跳过后续API调用');
     return;
   }
   
   // 获取积分套餐列表 - 后台异步更新，不影响初始显示
-  getPointsPackages().then(response => {
-    if (response && response.data && response.data.packages) {
+  try {
+    // 再次检查token过期状态
+    if (isTokenExpiredHandled) return;
+    
+    const packageResponse = await getPointsPackages();
+    if (packageResponse && packageResponse.data && packageResponse.data.packages) {
       // 成功获取后端数据时，更新套餐列表
-      pointsPackages.value = response.data.packages.map(pkg => ({
+      pointsPackages.value = packageResponse.data.packages.map(pkg => ({
         id: pkg.id,
         name: pkg.name,
         points: pkg.points,
@@ -540,12 +553,27 @@ onMounted(async () => {
         description: pkg.description,
         bonus_description: pkg.bonus_description
       }));
-      console.log('积分套餐数据已从后端更新:', pointsPackages.value);
+      console.log('✅ 积分套餐数据已从后端更新:', pointsPackages.value);
     }
-  }).catch(error => {
-    console.error('获取积分套餐失败，请刷新页面', error);
-    // 发生错误时保持使用初始的真实套餐数据，不改变显示
-  });
+  } catch (error) {
+    console.error('❌ 获取积分套餐失败:', error);
+    
+    // 检查是否为token过期错误
+    if (isTokenExpiredError(error)) {
+      console.log('🔐 积分套餐API检测到token过期');
+      handleTokenExpired();
+      return;
+    }
+    
+    // 发生其他错误时保持使用初始的真实套餐数据，不改变显示
+    console.log('📦 使用默认积分套餐数据');
+  }
+  
+  // 再次检查token过期状态，避免重复API调用
+  if (isTokenExpiredHandled) {
+    console.log('⚠️ Token过期已处理，跳过积分消费记录API');
+    return;
+  }
   
   // 获取本月积分消费
   try {
@@ -565,19 +593,21 @@ onMounted(async () => {
         total += Math.abs(trans.points);
       });
       monthlyPointsUsed.value = total;
+      console.log('✅ 积分消费记录获取成功');
     }
   } catch (error) {
-    console.error('获取积分消费记录失败:', error);
+    console.error('❌ 获取积分消费记录失败:', error);
     
     // 检查是否为token过期错误
     if (isTokenExpiredError(error)) {
-      console.log('积分消费API也检测到token过期');
+      console.log('🔐 积分消费API检测到token过期');
       handleTokenExpired();
       return;
     }
     
-    // 设置模拟数据
+    // 设置默认数据
     monthlyPointsUsed.value = 12680;
+    console.log('📊 使用默认积分消费数据');
   }
 });
 

@@ -31,20 +31,13 @@ api.interceptors.response.use(
     return response.data;
   },
   error => {
-    console.error('积分API请求错误:', error);
+    console.error('🔥 积分API请求错误:', error);
     
+    // 将401错误信息传递给调用方处理，不在这里直接刷新页面
+    // 让会员页面统一处理token过期逻辑
     if (error.response && error.response.status === 401) {
-      console.error('Token已过期或无效，清除本地认证信息');
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user_info');
-      localStorage.removeItem('token_expires_at');
-      
-      // 显示提示并刷新页面
-      setTimeout(() => {
-        alert('登录已过期，请刷新插件页面');
-        window.location.reload();
-      }, 100);
+      console.error('🔐 积分API检测到Token过期，传递给上层处理');
+      // 不在这里清除token和刷新页面，交给上层统一处理
     }
     
     return Promise.reject(error);
