@@ -305,11 +305,22 @@ if (isDevelopment || isLocalhost || hasDebugParam) {
     }
   };
   
+  // 调试信息：确认对象是否被创建
+  originalConsole.log('✅ window.logControl 对象已创建');
+  originalConsole.log('🔍 验证对象存在:', typeof window.logControl);
+  originalConsole.log('🔍 对象方法列表:', Object.keys(window.logControl));
+  
+  // 创建备用的调试函数，以防名称冲突
+  window.debugLogs = window.logControl;
+  window.logDebug = window.logControl;
+  originalConsole.log('🔧 备用调试函数已创建: window.debugLogs 和 window.logDebug');
+  
   // 显示初始化信息（仅开发环境）
   const envType = isDevelopment ? '开发模式' : (hasDebugParam ? '调试模式' : '本地模式');
   originalConsole.log(`
 🎛️ 日志控制系统已初始化 (${envType})
 📋 在控制台输入 logControl.help() 查看使用说明
+📋 或者尝试备用命令: debugLogs.help() 或 logDebug.help()
 📊 当前状态: ${LOG_CONFIG.enabled ? '✅ 日志已开启' : '❌ 日志已关闭'}
   `);
 } else {
