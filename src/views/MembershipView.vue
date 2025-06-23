@@ -108,13 +108,13 @@
             >
               当前等级
             </el-button>
-            <el-button 
+            <!-- <el-button 
               v-else
               class="tier-action" 
               @click="switchToFree"
             >
               降级到普通会员
-            </el-button>
+            </el-button>  -->
           </div>
           
 
@@ -122,7 +122,11 @@
           <!-- 专业会员 -->
           <div v-if="activeTier === 'professional'" class="tier-details">
             <h3 class="tier-name">专业会员<span class="tier-tag pro">推荐</span></h3>
-            <div class="tier-price">{{ getProfessionalMemberPrice() }} <small>元/年</small></div>
+            <div class="tier-price">
+              <span v-if="isLoadingPrice" class="blinking-price">298</span>
+              <span v-else>{{ getProfessionalMemberPrice() }}</span>
+              <small>元/年</small>
+            </div>
             <div class="tier-points">
               <div class="points-label">积分充值优惠</div>
               <div class="points-value">6.9折</div>
@@ -255,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Check, Close, Medal, InfoFilled, ChatDotSquare } from '@element-plus/icons-vue';
@@ -289,6 +293,11 @@ const targetUpgradeLevel = ref('professional');
 
 // 会员等级数据
 const membershipLevels = ref([]);
+
+// 🎯 数字滚动效果相关状态
+const isLoadingPrice = ref(true); // 价格加载状态
+const targetPrice = ref(298); // 目标价格
+const animationTimer = ref(null); // 动画定时器
 
 // 会员等级显示
 const memberLevelDisplay = computed(() => {
@@ -363,7 +372,47 @@ const isExpiringSoon = computed(() => {
   return diffDays >= 0 && diffDays <= 7;
 });
 
+// 🎯 启动简单闪烁效果
+const startPriceAnimation = () => {
+  console.log('🎯 启动价格闪烁效果');
+  // 闪烁效果完全由CSS控制，无需JavaScript定时器
+};
+
+// 🎯 停止闪烁效果
+const stopPriceAnimation = () => {
+  console.log('🛑 停止价格闪烁');
+  // 直接显示真实价格
+  isLoadingPrice.value = false;
+  console.log('✅ 闪烁已停止，显示真实价格');
+};
+
+// 🎯 检查价格是否已加载
+const checkPriceLoaded = () => {
+  const professionalLevel = membershipLevels.value.find(level => 
+    level.name === '专业会员' || level.id === 11
+  );
+  
+  if (professionalLevel && professionalLevel.price) {
+    // 更新目标价格
+    targetPrice.value = professionalLevel.price;
+    console.log('🎯 获取到真实价格:', professionalLevel.price);
+    
+    // 获取到真实价格后停止闪烁
+    setTimeout(() => {
+      stopPriceAnimation();
+    }, 800); // 短暂延迟让用户看到闪烁效果
+  }
+};
+
+// 🎯 监听会员等级数据变化
+watch(membershipLevels, () => {
+  checkPriceLoaded();
+}, { deep: true });
+
 onMounted(async () => {
+  // 🎯 启动价格计数动画
+  startPriceAnimation();
+  
   // 默认显示专业会员页面，引导用户充值
   activeTier.value = 'professional';
   
@@ -381,6 +430,9 @@ onMounted(async () => {
         level.name === '专业会员' || level.id === 11
       );
       console.log('找到的专业会员:', professionalMember);
+      
+      // 🎯 检查价格是否已加载
+      checkPriceLoaded();
     }
   } catch (error) {
     console.error('获取会员等级失败:', error);
@@ -389,6 +441,26 @@ onMounted(async () => {
     if (error.message && (error.message.includes('Token') || error.message.includes('登录') || error.message.includes('过期'))) {
       hasTokenError = true;
       console.log('检测到token过期，停止后续API调用');
+      
+      // 显示友好的提示信息
+      ElMessage.warning({
+        message: '登录状态已过期，正在重新获取认证信息...',
+        duration: 3000
+      });
+      
+      // 清除过期的认证信息
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_info');
+      localStorage.removeItem('token_expires_at');
+      
+      // 延迟刷新插件，让用户看到提示信息
+      setTimeout(() => {
+        console.log('开始重新认证流程...');
+        // 刷新整个插件页面以重新获取token
+        window.location.reload();
+      }, 2000);
+      
       return; // 立即停止执行
     }
     
@@ -419,6 +491,11 @@ onMounted(async () => {
         features: ['充值优惠', '优先客服', '专属标识']
       }
     ];
+    
+    // 🎯 使用默认数据时也要停止闪烁
+    setTimeout(() => {
+      stopPriceAnimation();
+    }, 1500);
   }
   
   // 如果前面已经检测到token错误，停止后续API调用
@@ -471,6 +548,29 @@ onMounted(async () => {
     // 检查是否为token过期错误，如果是则不设置模拟数据
     if (error.message && (error.message.includes('Token') || error.message.includes('登录') || error.message.includes('过期'))) {
       console.log('积分消费API也检测到token过期');
+      
+      // 如果前面还没有处理过token过期，在这里也处理
+      if (!hasTokenError) {
+        // 显示友好的提示信息
+        ElMessage.warning({
+          message: '登录状态已过期，正在重新获取认证信息...',
+          duration: 3000
+        });
+        
+        // 清除过期的认证信息
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_info');
+        localStorage.removeItem('token_expires_at');
+        
+        // 延迟刷新插件，让用户看到提示信息
+        setTimeout(() => {
+          console.log('开始重新认证流程...');
+          // 刷新整个插件页面以重新获取token
+          window.location.reload();
+        }, 2000);
+      }
+      
       return;
     }
     // 设置模拟数据
@@ -674,13 +774,13 @@ const joinOfficialGroup = () => {
           chatId: groupInfo.id,
           chatType: 'group'
         }).catch(error => {
-          console.log('[加群功能] JSBridge失败，使用备用方案:', error);
-          fallbackOpenGroup(groupLink);
+          console.log('[加群功能] JSBridge失败，使用链接跳转:', error);
+          window.open(groupLink, '_blank', 'noopener,noreferrer');
         });
       } else {
         // 方法2: 直接使用链接跳转
         console.log('[加群功能] 使用链接跳转方式');
-        fallbackOpenGroup(groupLink);
+        window.open(groupLink, '_blank', 'noopener,noreferrer');
       }
     }
 
@@ -689,65 +789,6 @@ const joinOfficialGroup = () => {
     ElMessage.error('打开群聊失败，请稍后重试');
   }
 };
-
-// 备用方案：使用链接打开群聊
-const fallbackOpenGroup = (groupLink) => {
-  try {
-    // 在新窗口打开群链接
-    const newWindow = window.open(groupLink, '_blank', 'noopener,noreferrer');
-    
-    // 如果弹窗被阻止，提供手动复制选项
-    setTimeout(() => {
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        console.log('[加群功能] 弹窗被阻止，显示手动加群选项');
-        showManualJoinOption(groupLink);
-      }
-    }, 1000);
-
-  } catch (error) {
-    console.error('[加群功能] 链接跳转失败:', error);
-    showManualJoinOption(groupLink);
-  }
-};
-
-// 显示手动加群选项
-const showManualJoinOption = (groupLink) => {
-  ElMessageBox.confirm(
-    `群聊链接可能被浏览器阻止，您可以：\n\n1. 点击"复制链接"手动加入\n2. 联系客服获取帮助\n\n群链接：${groupLink}`,
-    '🎉 加入官方交流群',
-    {
-      confirmButtonText: '复制链接',
-      cancelButtonText: '稍后再说',
-      type: 'info'
-    }
-  ).then(() => {
-    // 复制链接到剪贴板
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(groupLink).then(() => {
-        ElMessage.success('群链接已复制到剪贴板！');
-      }).catch(() => {
-        ElMessage.warning('复制失败，请手动复制链接');
-      });
-    } else {
-      // 备用复制方案
-      const textArea = document.createElement('textarea');
-      textArea.value = groupLink;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try {
-        document.execCommand('copy');
-        ElMessage.success('群链接已复制到剪贴板！');
-      } catch (err) {
-        ElMessage.warning('复制失败，请手动复制链接');
-      }
-      document.body.removeChild(textArea);
-    }
-  }).catch(() => {
-    console.log('[加群功能] 用户取消加群');
-  });
-};
-
-
 
 // 返回上一页
 const goBack = () => {
@@ -761,6 +802,15 @@ const goBack = () => {
     router.back();
   }, 100);
 };
+
+// 🎯 组件卸载时清理定时器
+onUnmounted(() => {
+  if (animationTimer.value) {
+    clearTimeout(animationTimer.value);
+    animationTimer.value = null;
+    console.log('🧹 组件卸载，清理定时器');
+  }
+});
 </script>
 
 <style scoped>
@@ -1172,7 +1222,23 @@ const goBack = () => {
   margin-bottom: 8px;
 }
 
+/* 🎯 简单闪烁效果样式 */
+.blinking-price {
+  display: inline-block;
+  font-weight: bold;
+  font-size: inherit;
+  color: inherit;
+  animation: blinkingEffect 1.2s ease-in-out infinite;
+}
 
+@keyframes blinkingEffect {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
 
 @media (min-width: 768px) {
   .membership-status {
