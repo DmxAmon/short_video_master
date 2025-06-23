@@ -325,8 +325,7 @@ if (isDevelopment || isLocalhost || hasDebugParam) {
   `);
 } else {
   // 生产环境下，只显示简单的初始化信息
-  originalConsole.log('🎛️ 日志系统已初始化 (生产模式 - 日志已关闭)');
-  originalConsole.log('💡 如需调试，请在URL后添加 ?debug_logs 参数');
+  originalConsole.log('🎛️ 日志系统已初始化');
 }
 
 // 全局日志记录器实例
