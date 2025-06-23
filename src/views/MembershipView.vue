@@ -372,6 +372,8 @@ const isExpiringSoon = computed(() => {
   return diffDays >= 0 && diffDays <= 7;
 });
 
+
+
 // 🎯 启动简单闪烁效果
 const startPriceAnimation = () => {
   console.log('🎯 启动价格闪烁效果');
@@ -459,17 +461,22 @@ onMounted(async () => {
   // 获取会员等级列表
   try {
     const response = await getMembershipLevelsNew();
-    if (response && response.data) {
-      membershipLevels.value = response.data;
+    console.log('🔍 会员等级API响应:', response);
+    
+    if (response && response.data && response.data.levels) {
+      membershipLevels.value = response.data.levels;
+      console.log('✅ 会员等级数据已更新:', membershipLevels.value);
       
       // 查找专业会员等级
       const professionalMember = membershipLevels.value.find(level => 
         level.name === '专业会员' || level.id === 11
       );
-      console.log('找到的专业会员:', professionalMember);
+      console.log('🎯 找到的专业会员:', professionalMember);
       
       // 🎯 检查价格是否已加载
       checkPriceLoaded();
+    } else {
+      console.warn('⚠️ 会员等级API响应格式异常:', response);
     }
   } catch (error) {
     console.error('获取会员等级失败:', error);
