@@ -28,7 +28,17 @@ const LOG_CONFIG = {
     // 'AUTH': false,     // 关闭认证模块日志
     // 'API': false,      // 关闭API模块日志
     // 'ROUTER': false,   // 关闭路由模块日志
-  }
+  },
+  
+  // 是否拦截原生console方法（控制所有console.log/warn/error输出）
+  interceptConsole: true,
+  
+  // 允许通过的console日志关键词（即使总开关关闭，包含这些关键词的日志仍会显示）
+  allowedConsoleKeywords: [
+    // '错误',     // 允许错误相关日志
+    // 'Error',    // 允许Error日志
+    // '失败',     // 允许失败相关日志
+  ]
 };
 
 // 计算当前日志级别
@@ -139,8 +149,175 @@ export const createLogger = (moduleName) => {
   };
 };
 
-// 导出日志配置，允许运行时动态调整
-export { LOG_CONFIG };
+// 保存原始console方法
+const originalConsole = {
+  log: console.log,
+  warn: console.warn,
+  error: console.error,
+  info: console.info,
+  debug: console.debug
+};
+
+// console拦截器
+function shouldAllowConsoleLog(args) {
+  // 如果日志总开关开启，允许所有日志
+  if (LOG_CONFIG.enabled) {
+    return true;
+  }
+  
+  // 如果没有设置允许的关键词，直接阻止
+  if (!LOG_CONFIG.allowedConsoleKeywords || LOG_CONFIG.allowedConsoleKeywords.length === 0) {
+    return false;
+  }
+  
+  // 检查日志内容是否包含允许的关键词
+  const logContent = args.map(arg => 
+    typeof arg === 'string' ? arg : JSON.stringify(arg)
+  ).join(' ');
+  
+  return LOG_CONFIG.allowedConsoleKeywords.some(keyword => 
+    logContent.includes(keyword)
+  );
+}
+
+// 拦截console方法
+function interceptConsole() {
+  if (!LOG_CONFIG.interceptConsole) {
+    return;
+  }
+  
+  console.log = function(...args) {
+    if (shouldAllowConsoleLog(args)) {
+      originalConsole.log.apply(console, args);
+    }
+  };
+  
+  console.warn = function(...args) {
+    if (shouldAllowConsoleLog(args)) {
+      originalConsole.warn.apply(console, args);
+    }
+  };
+  
+  console.error = function(...args) {
+    if (shouldAllowConsoleLog(args)) {
+      originalConsole.error.apply(console, args);
+    }
+  };
+  
+  console.info = function(...args) {
+    if (shouldAllowConsoleLog(args)) {
+      originalConsole.info.apply(console, args);
+    }
+  };
+  
+  console.debug = function(...args) {
+    if (shouldAllowConsoleLog(args)) {
+      originalConsole.debug.apply(console, args);
+    }
+  };
+}
+
+// 恢复原始console方法
+function restoreConsole() {
+  console.log = originalConsole.log;
+  console.warn = originalConsole.warn;
+  console.error = originalConsole.error;
+  console.info = originalConsole.info;
+  console.debug = originalConsole.debug;
+}
+
+// 初始化console拦截
+if (LOG_CONFIG.interceptConsole) {
+  interceptConsole();
+}
+
+// 创建全局日志控制面板
+// 只在开发环境或特定条件下暴露给用户
+const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+// 检查是否有调试参数（用于生产环境远程调试）
+const hasDebugParam = new URLSearchParams(window.location.search).has('debug_logs');
+
+// 只在开发环境、本地环境或有调试参数时暴露日志控制面板
+if (isDevelopment || isLocalhost || hasDebugParam) {
+  window.logControl = {
+    // 开启所有日志
+    enableAll() {
+      LOG_CONFIG.enabled = true;
+      LOG_CONFIG.interceptConsole = false;
+      restoreConsole();
+      originalConsole.log('✅ 已开启所有日志输出');
+    },
+    
+    // 关闭所有日志
+    disableAll() {
+      LOG_CONFIG.enabled = false;
+      LOG_CONFIG.interceptConsole = true;
+      LOG_CONFIG.allowedConsoleKeywords = [];
+      interceptConsole();
+      originalConsole.log('❌ 已关闭所有日志输出');
+    },
+    
+    // 只允许错误日志
+    onlyErrors() {
+      LOG_CONFIG.enabled = false;
+      LOG_CONFIG.interceptConsole = true;
+      LOG_CONFIG.allowedConsoleKeywords = ['错误', 'Error', 'error', '失败', 'fail', 'Failed'];
+      interceptConsole();
+      originalConsole.log('⚠️ 只允许错误相关日志输出');
+    },
+    
+    // 查看当前配置
+    status() {
+      originalConsole.log('📊 当前日志配置:', {
+        enabled: LOG_CONFIG.enabled,
+        interceptConsole: LOG_CONFIG.interceptConsole,
+        allowedKeywords: LOG_CONFIG.allowedConsoleKeywords,
+        customLevel: LOG_CONFIG.customLevel
+      });
+    },
+    
+    // 帮助信息
+    help() {
+      originalConsole.log(`
+📋 日志控制面板使用说明：
+
+🟢 logControl.enableAll()    - 开启所有日志输出
+🔴 logControl.disableAll()   - 关闭所有日志输出  
+🟡 logControl.onlyErrors()   - 只显示错误日志
+📊 logControl.status()       - 查看当前配置
+❓ logControl.help()         - 显示帮助信息
+
+当前状态: ${LOG_CONFIG.enabled ? '✅ 已开启' : '❌ 已关闭'}
+      `);
+    }
+  };
+  
+  // 显示初始化信息（仅开发环境）
+  const envType = isDevelopment ? '开发模式' : (hasDebugParam ? '调试模式' : '本地模式');
+  originalConsole.log(`
+🎛️ 日志控制系统已初始化 (${envType})
+📋 在控制台输入 logControl.help() 查看使用说明
+📊 当前状态: ${LOG_CONFIG.enabled ? '✅ 日志已开启' : '❌ 日志已关闭'}
+  `);
+} else {
+  // 生产环境下，只显示简单的初始化信息
+  if (!LOG_CONFIG.enabled) {
+    originalConsole.log('🎛️ 日志系统已初始化 (生产模式 - 日志已关闭)');
+  }
+}
+
+// 全局日志记录器实例
+const logger = createLogger('APP');
+
+// 统一导出所有需要的方法和配置
+export { 
+  logger, 
+  interceptConsole, 
+  restoreConsole, 
+  originalConsole,
+  LOG_CONFIG
+};
 
 // 默认导出全局日志记录器
-export default createLogger('APP'); 
+export default logger; 

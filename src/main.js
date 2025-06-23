@@ -6,6 +6,10 @@
  * @LastTime   : 2025-02-23 16:34
  * @desc       :
  */
+
+// 首先导入并初始化日志控制系统（必须在所有其他代码之前）
+import './utils/logger.js';
+
 import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router'; // 导入路由配置
