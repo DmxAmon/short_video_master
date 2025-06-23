@@ -238,6 +238,18 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
 // 检查是否有调试参数（用于生产环境远程调试）
 const hasDebugParam = new URLSearchParams(window.location.search).has('debug_logs');
 
+// 调试信息：显示环境检测结果
+originalConsole.log('🔍 环境检测结果:', {
+  isDevelopment,
+  isLocalhost,
+  hasDebugParam,
+  hostname: window.location.hostname,
+  search: window.location.search,
+  env_DEV: import.meta.env.DEV,
+  env_MODE: import.meta.env.MODE,
+  shouldShowControl: isDevelopment || isLocalhost || hasDebugParam
+});
+
 // 只在开发环境、本地环境或有调试参数时暴露日志控制面板
 if (isDevelopment || isLocalhost || hasDebugParam) {
   window.logControl = {
@@ -302,9 +314,8 @@ if (isDevelopment || isLocalhost || hasDebugParam) {
   `);
 } else {
   // 生产环境下，只显示简单的初始化信息
-  if (!LOG_CONFIG.enabled) {
-    originalConsole.log('🎛️ 日志系统已初始化 (生产模式 - 日志已关闭)');
-  }
+  originalConsole.log('🎛️ 日志系统已初始化 (生产模式 - 日志已关闭)');
+  originalConsole.log('💡 如需调试，请在URL后添加 ?debug_logs 参数');
 }
 
 // 全局日志记录器实例
