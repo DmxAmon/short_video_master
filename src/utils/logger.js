@@ -21,13 +21,13 @@ const LOG_CONFIG = {
   // 自定义日志级别（如果设置，会覆盖环境自动判断）
   // 可选值：'ERROR', 'WARN', 'INFO', 'DEBUG', 'OFF'
   // 设置为 null 时使用环境自动判断
-  customLevel: 'DEBUG',
+  customLevel: 'INFO',
   
   // 特定模块的日志控制（可以单独关闭某些模块的日志）
   moduleFilters: {
-    // 'AUTH': false,     // 关闭认证模块日志
-    // 'API': false,      // 关闭API模块日志
-    // 'ROUTER': false,   // 关闭路由模块日志
+     'AUTH': false,     // 关闭认证模块日志
+     'API': false,      // 关闭API模块日志
+     'ROUTER': false,   // 关闭路由模块日志
   },
   
   // 是否拦截原生console方法（控制所有console.log/warn/error输出）
