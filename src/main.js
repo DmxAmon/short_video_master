@@ -77,33 +77,38 @@ async function initializeApp() {
   // 配置i18n
   i18n.global.locale = 'zh';
 
-  // 如果在飞书环境中，等待SDK加载
+  // 如果在飞书环境中，静默等待SDK加载
   if (isInLarkEnvironment) {
-    console.log('📱 在飞书环境中，等待SDK初始化...');
+    // 移除用户可见的提示信息，让SDK在后台静默初始化
+    console.log('🔄 飞书环境中，后台初始化SDK...');
     
-    const sdkLoaded = await waitForBitableSDK();
-    
-    if (sdkLoaded) {
-      console.log('✅ 飞书SDK初始化成功，尝试获取语言设置...');
-      try {
-        // 使用导入的bitable对象
-        const lang = await bitable.bridge.getLanguage();
-        console.log('飞书语言设置:', lang);
-        
-        // 设置飞书返回的语言，但如果不是中文相关语言，则仍使用中文
-        const _isZh = lang === 'zh' || lang === 'zh-HK' || lang === 'zh-TW';
-        if (_isZh) {
-          i18n.global.locale = lang;
-          console.log('设置语言为:', lang);
-        } else {
-          console.log('使用默认中文语言');
+    // 不阻塞应用启动，让SDK在后台初始化
+    waitForBitableSDK().then(sdkLoaded => {
+      if (sdkLoaded) {
+        console.log('✅ 飞书SDK后台初始化成功');
+        try {
+          // 使用导入的bitable对象
+          bitable.bridge.getLanguage().then(lang => {
+            console.log('飞书语言设置:', lang);
+            
+            // 设置飞书返回的语言，但如果不是中文相关语言，则仍使用中文
+            const _isZh = lang === 'zh' || lang === 'zh-HK' || lang === 'zh-TW';
+            if (_isZh) {
+              i18n.global.locale = lang;
+              console.log('设置语言为:', lang);
+            } else {
+              console.log('使用默认中文语言');
+            }
+          }).catch(err => {
+            console.warn('获取飞书语言失败:', err);
+          });
+        } catch (err) {
+          console.warn('获取飞书语言失败:', err);
         }
-      } catch (err) {
-        console.warn('获取飞书语言失败:', err);
+      } else {
+        console.warn('⚠️ 飞书SDK后台初始化失败，使用默认配置');
       }
-    } else {
-      console.warn('⚠️ 飞书SDK初始化失败，使用默认配置');
-    }
+    });
   } else {
     console.log('🌐 不在飞书环境中，使用默认配置');
   }

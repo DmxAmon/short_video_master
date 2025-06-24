@@ -353,6 +353,8 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { CaretRight, VideoPause, VideoPlay, CircleClose, ArrowDown, Lock } from '@element-plus/icons-vue';
 import InfoCard from '../components/common/InfoCard.vue';
 import PermissionWrapper from '../components/common/PermissionWrapper.vue';
+// 导入智能认证工具
+import { useSmartAuth } from '../utils/smart-auth';
 
 const props = defineProps({
   user: {
@@ -360,6 +362,9 @@ const props = defineProps({
     required: true
   }
 });
+
+// 使用智能认证
+const { isTokenExpiredError, handleTokenExpiredSmart, createSmartApiCall } = useSmartAuth('视频监控页面');
 
 // 不使用模拟数据，强制使用真实API
 const useMockData = ref(false);

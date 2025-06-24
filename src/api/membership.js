@@ -40,7 +40,7 @@ api.interceptors.response.use(
     // 统一错误处理
     console.error('会员API请求错误:', error);
     
-    // 如果是401错误，清除token并提示刷新页面
+    // 如果是401错误，清除token但不刷新页面
     if (error.response && error.response.status === 401) {
       console.error('Token已过期或无效，清除本地认证信息');
       localStorage.removeItem('access_token');
@@ -48,11 +48,8 @@ api.interceptors.response.use(
       localStorage.removeItem('user_info');
       localStorage.removeItem('token_expires_at');
       
-      // 显示提示并刷新页面
-      setTimeout(() => {
-        alert('登录已过期，请刷新插件页面');
-        window.location.reload();
-      }, 100);
+      // 移除自动刷新页面的逻辑，让统一的token过期处理来处理
+      console.log('🔐 会员API检测到401错误，交由统一处理');
     }
     
     return Promise.reject(error);

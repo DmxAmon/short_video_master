@@ -39,25 +39,23 @@ if (bitable && bitable.bridge) {
         console.log('飞书语言设置:', locale);
       }
       
-      // 检查当前用户ID是否为空，如果为空则强制重新认证
+      // 检查当前用户ID是否为空，如果为空则清除认证信息
       const currentUserInfo = localStorage.getItem('user_info');
       if (currentUserInfo) {
         try {
           const userObj = JSON.parse(currentUserInfo);
           const userId = userObj?.id || userObj?.user?.id;
           if (!userId || userId.trim() === '') {
-            console.log('🔄 检测到用户ID为空，强制重新认证...');
-            // 清除所有认证信息，强制重新认证
+            console.log('🔄 检测到用户ID为空，清除认证信息...');
+            // 清除所有认证信息，但不自动刷新页面
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user_info');
             localStorage.removeItem('token_expires_at');
             clearUserIdCache();
             
-            // 触发重新认证
-            setTimeout(() => {
-              window.location.reload();
-            }, 1000);
+            // 移除自动刷新页面的逻辑，让统一的token过期处理来处理
+            console.log('🔐 用户ID为空，已清除认证信息，交由统一处理');
           }
         } catch (parseError) {
           console.warn('解析用户信息失败:', parseError);
@@ -81,9 +79,13 @@ if (bitable && bitable.bridge) {
           const userObj = JSON.parse(currentUserInfo);
           const userId = userObj?.id || userObj?.user?.id;
           if (!userId || userId.trim() === '') {
-            console.log('🔄 SDK延迟加载后检测到用户ID为空，强制重新认证...');
+            console.log('�� SDK延迟加载后检测到用户ID为空，清除认证信息...');
             clearUserIdCache();
-            window.location.reload();
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user_info');
+            localStorage.removeItem('token_expires_at');
+            console.log('🔐 用户ID为空，已清除认证信息，交由统一处理');
           }
         } catch (parseError) {
           console.warn('解析用户信息失败:', parseError);
@@ -419,13 +421,16 @@ async function checkAndRefreshToken() {
 /**
  * 刷新token
  */
-async function refreshToken() {
+export async function refreshToken() {
   try {
     const refreshTokenValue = localStorage.getItem('refresh_token');
     if (!refreshTokenValue) {
-      console.log('没有refresh token，无法刷新');
+      console.log('🔐 没有refresh token，无法刷新');
       return false;
     }
+    
+    console.log('🔄 开始刷新token，refresh_token长度:', refreshTokenValue.length);
+    console.log('🌐 请求URL:', `${API_BASE_URL}/auth/refresh`);
     
     const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',
@@ -437,22 +442,44 @@ async function refreshToken() {
       })
     });
     
+    console.log('📡 刷新请求响应状态:', response.status, response.statusText);
+    
     if (response.ok) {
       const result = await response.json();
+      console.log('📦 刷新响应数据:', JSON.stringify(result, null, 2));
+      
       if (result.code === 0) {
         // 保存新的token
         localStorage.setItem('access_token', result.data.access_token);
         localStorage.setItem('refresh_token', result.data.refresh_token);
         localStorage.setItem('token_expires_at', Date.now() + (result.data.expires_in * 1000));
-        console.log('Token刷新成功');
+        console.log('✅ Token刷新成功');
         return true;
+      } else {
+        console.log('❌ Token刷新失败，错误代码:', result.code, '错误信息:', result.message);
+        return false;
       }
+    } else {
+      // 获取错误响应内容
+      let errorText = '';
+      try {
+        const errorData = await response.json();
+        errorText = JSON.stringify(errorData);
+      } catch (e) {
+        errorText = await response.text();
+      }
+      console.log('❌ Token刷新HTTP错误:', response.status, response.statusText, '响应内容:', errorText);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Token刷新网络错误:', error.message);
+    console.error('❌ 错误详情:', error);
+    
+    // 检查是否是网络连接问题
+    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+      console.log('🌐 可能是网络连接问题或CORS问题');
     }
     
-    console.log('Token刷新失败');
-    return false;
-  } catch (error) {
-    console.error('Token刷新出错:', error);
     return false;
   }
 }

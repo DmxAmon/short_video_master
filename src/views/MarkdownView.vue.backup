@@ -343,8 +343,8 @@ const navigateCell = async (direction) => {
     if (!markdownMetadata.tableId || !markdownMetadata.fieldId || !markdownMetadata.recordId) {
       console.log('缺少必要的单元格信息');
       ElMessage.warning('请先选择一个单元格');
-      return;
-    }
+          return;
+        }
     
     // 保存当前滚动位置
     const scrollPosition = window.scrollY;
@@ -372,7 +372,7 @@ const navigateCell = async (direction) => {
     if (!table) {
       console.error('无法获取表格');
       ElMessage.error('无法获取表格信息');
-      return;
+        return;
     }
     
     // 尝试方法1: 使用视图导航（如果有视图）
@@ -1521,11 +1521,12 @@ button:disabled {
   padding: 0;
   border: 1px solid #dcdfe6;
   border-radius: 4px;
-  background-color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: #fff;
   color: #606266;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
   position: relative;
@@ -1544,21 +1545,17 @@ button:disabled {
   border-color: #e4e7ed;
 }
 
-/* 隐藏按钮内的tooltip文字，只在悬停时显示 */
 .header-btn .tooltip {
   display: none;
   position: absolute;
   background: rgba(0, 0, 0, 0.75);
   color: white;
-  padding: 4px 8px;
+  padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
   white-space: nowrap;
-  bottom: -28px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: -24px;
   z-index: 10;
-  pointer-events: none;
 }
 
 .header-btn:hover .tooltip {
@@ -1618,7 +1615,7 @@ button:disabled {
 }
 
 select, .radio-options, .uniform-select {
-  width: 100%;
+  width: 200px;
   height: 36px;
   padding: 0 12px;
   border: 1px solid #dcdfe6;
@@ -1636,31 +1633,16 @@ select:disabled {
 .radio-options {
   display: flex;
   gap: 16px;
-  border: none;
-  height: auto;
-  padding: 0;
-  background: transparent;
 }
-
 .radio-options label {
   display: flex;
   align-items: center;
   gap: 8px;
   width: auto;
   cursor: pointer;
-  font-size: 8px;
   font-weight: 400;
-  border: none;
-  background: transparent;
-}
-
-.radio-options input[type="radio"] {
-  border: none;
-  outline: none;
-}
-
-.radio-label-with-tooltip {
-  position: relative;
+  font-size: 8px; /* 将字体大小从默认的14px改为8px，减小一半 */
+}  position: relative;
 }
 
 .radio-text {
@@ -1706,7 +1688,7 @@ select:disabled {
 
 .export-button {
   height: 36px;
-  background-color: #2E6BE6;
+  background-color: #2E6BE6; /* 飞书品牌蓝 */
   color: white;
   border: none;
   padding: 0 20px;
@@ -1728,18 +1710,10 @@ select:disabled {
   color: white;
 }
 
-/* 响应式适配 - 只在小屏幕时改为垂直布局 */
-@media (max-width: 480px) {
-  .radio-options {
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-  }
-}
-
+/* 响应式适配 */
 @media (max-width: 358px) {
   .toolbar {
-    flex-direction: column;
+  flex-direction: column;
     align-items: flex-start;
   }
   
@@ -1758,27 +1732,13 @@ select:disabled {
   }
   
   .option-row label {
-    width: 100%;
+  width: 100%;
     margin-bottom: 6px;
   }
   
-  select, .uniform-select {
+  select, .radio-options, .uniform-select {
     width: 100% !important;
     flex: 1 !important;
-  }
-  
-  /* 单选按钮组特殊处理 */
-  .radio-options {
-    width: auto !important;
-    flex: none !important;
-    flex-direction: column;
-    gap: 8px;
-    align-items: flex-start;
-  }
-  
-  .radio-options label {
-    width: auto !important;
-    margin-bottom: 0;
   }
 }
 
@@ -1840,6 +1800,29 @@ button:disabled {
   border-color: #dcdfe6;
 }
 
+/* 编辑区标题按钮样式 */
+.header-btn {
+  width: 28px;
+  height: 28px;
+  min-width: unset;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #606266;
+}
+
+.header-btn:hover {
+  background-color: #f2f6fc;
+  color: #409eff;
+  border-color: #c6e2ff;
+}
+
+.header-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* 导航区域固定样式 */
 .navigation-area {
   position: fixed;
@@ -1847,7 +1830,7 @@ button:disabled {
   right: 20px;
   z-index: 999;
   display: flex;
-  flex-direction: column;
+    flex-direction: column;
   gap: 8px;
 }
 

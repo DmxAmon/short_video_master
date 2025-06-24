@@ -30,9 +30,14 @@ import { tableUpdateService } from '../services/tableUpdateService';
 import RealtimeTranscriptionDisplay from '../components/RealtimeTranscriptionDisplay.vue';
 // 导入MarkdownView组件 - 用于内容预览模式
 import MarkdownView from './MarkdownView.vue';
+// 导入智能认证工具
+import { useSmartAuth } from '../utils/smart-auth';
 
 // 创建模块日志记录器
 const logger = createLogger('DOUYIN');
+
+// 使用智能认证
+const { isTokenExpiredError, handleTokenExpiredSmart, resetTokenExpiredState } = useSmartAuth('抖音采集页面');
 
 // ==================== 主模式状态管理 ====================
 
@@ -396,17 +401,22 @@ class TranscriptionErrorHandler {
   
   // 未授权处理
   static handleUnauthorized() {
-    ElMessage.error({
-      message: '认证已过期，请刷新插件页面重新加载',
-      duration: 3000
+    // 使用智能认证处理，不直接显示错误消息
+    handleTokenExpiredSmart({
+      onSuccess: async () => {
+        console.log('✅ 智能认证成功，继续操作');
+      },
+      onFailed: () => {
+        ElMessage.error({
+          message: '认证已过期，正在刷新页面重新加载',
+          duration: 3000
+        });
+      }
     });
-    
-    // 清除本地token
-    localStorage.removeItem('access_token');
     
     return {
       type: 'unauthorized',
-      userAction: 'refresh_page',
+      userAction: 'smart_reauth',
       details: null
     };
   }
@@ -1835,7 +1845,7 @@ onMounted(async () => {
   // 获取API基础URL - 从localStorage或使用默认值
   const backendUrl = localStorage.getItem('api_base_url') || 'https://fsbk.dy2bcsm.cn/api';
   
-  // 验证令牌有效性 - 使用正确的API路径
+  // 验证令牌有效性 - 使用智能认证处理
   try {
     console.log('验证认证状态，API路径:', `${backendUrl}/plugin-auth/user`);
     const response = await fetch(`${backendUrl}/plugin-auth/user`, {
@@ -1848,21 +1858,51 @@ onMounted(async () => {
     
     if (!response.ok) {
       console.warn('认证令牌无效，状态码:', response.status);
-      // 静默处理认证失败，不显示错误消息给用户
-      // 清除无效的认证信息
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user_info');
-      console.log('已清除无效的认证信息，等待重新认证');
-      return;
+      
+      // 使用智能认证处理token过期
+      const authSuccess = await handleTokenExpiredSmart({
+        onSuccess: async () => {
+          console.log('✅ 智能认证成功，重新加载数据表');
+          // 重新加载数据表
+          await loadAvailableTables();
+          if (availableTables.value.length > 0) {
+            selectedTable.value = availableTables.value[0].id;
+            await updateViewsList();
+          }
+        }
+      });
+      
+      if (!authSuccess) {
+        console.log('智能认证失败，停止初始化');
+        return;
+      }
+    } else {
+      const userInfo = await response.json();
+      console.log('认证验证成功，用户信息:', userInfo);
     }
-    
-    const userInfo = await response.json();
-    console.log('认证验证成功，用户信息:', userInfo);
   } catch (error) {
     console.error('验证认证状态失败:', error);
-    // 静默处理验证失败，不显示错误消息
-    console.log('认证验证失败，可能是网络问题或认证尚未完成');
-    return;
+    
+    // 检查是否为token过期错误
+    if (isTokenExpiredError(error)) {
+      const authSuccess = await handleTokenExpiredSmart({
+        onSuccess: async () => {
+          console.log('✅ 智能认证成功，重新加载数据表');
+          await loadAvailableTables();
+          if (availableTables.value.length > 0) {
+            selectedTable.value = availableTables.value[0].id;
+            await updateViewsList();
+          }
+        }
+      });
+      
+      if (!authSuccess) {
+        return;
+      }
+    } else {
+      console.log('认证验证失败，可能是网络问题');
+      return;
+    }
   }
   
   // 加载可用数据表

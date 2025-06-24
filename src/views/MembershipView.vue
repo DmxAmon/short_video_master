@@ -13,6 +13,10 @@
           <el-icon><ChatDotSquare /></el-icon>
           加入官方群
         </el-button>
+        <!-- 暂时隐藏调试按钮 -->
+        <!-- <el-button @click="toggleDebugMode" size="small" type="info" v-if="props.user.memberLevel === 'professional'">
+          🔧 调试
+        </el-button> -->
         <el-button @click="goBack" class="back-button">返回</el-button>
       </div>
     </div>
@@ -245,6 +249,54 @@
       @payment-cancel="handlePaymentCancel"
     />
 
+    <!-- 暂时隐藏调试面板 -->
+    <!-- <InfoCard title="🔧 RefreshToken调试工具" v-if="isDebugMode" style="margin-top: 20px; border: 2px dashed #409EFF;">
+      <div class="debug-panel">
+        <div class="debug-info">
+          <p><strong>调试说明：</strong></p>
+          <ul>
+            <li>此面板仅在专业会员模式下显示</li>
+            <li>用于测试和诊断RefreshToken功能</li>
+            <li>所有操作结果请查看浏览器控制台</li>
+          </ul>
+        </div>
+        
+        <div class="debug-actions">
+          <el-button @click="checkAuthStatus" type="primary" size="small">
+            📊 检查认证状态
+          </el-button>
+          <el-button @click="diagnoseAuth" type="warning" size="small">
+            🔧 诊断认证问题
+          </el-button>
+          <el-button @click="testRefreshToken" type="success" size="small">
+            🔄 测试RefreshToken
+          </el-button>
+          <el-button @click="simulateExpiry" type="danger" size="small">
+            🧪 模拟Token过期
+          </el-button>
+          <el-button @click="generateDebugReport" type="info" size="small">
+            📋 生成完整报告
+          </el-button>
+        </div>
+        
+        <div class="debug-tips">
+          <el-alert
+            title="使用提示"
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <p>1. 先点击"检查认证状态"查看当前token情况</p>
+              <p>2. 如果没有refresh_token，点击"诊断认证问题"</p>
+              <p>3. 可以用"模拟Token过期"来测试智能认证流程</p>
+              <p>4. "测试RefreshToken"直接测试token刷新功能</p>
+            </template>
+          </el-alert>
+        </div>
+      </div>
+    </InfoCard> -->
+
     <!-- 会员升级模态框 -->
     <MembershipUpgradeModal
       v-model="showUpgradeModal"
@@ -268,6 +320,8 @@ import PaymentModal from '../components/payment/PaymentModal.vue';
 import MembershipUpgradeModal from '../components/membership/MembershipUpgradeModal.vue';
 import { getMembershipStatus, getPointsTransactions, getMembershipLevelsNew } from '../api/membership';
 import { getPointsPackages, createPointsOrder } from '../api/points';
+import { refreshToken, initializeAuth } from '../services/auth';
+import { checkAuthStatus, diagnoseRefreshTokenIssue, simulateTokenExpiry, generateAuthReport } from '../utils/auth-debug';
 
 const props = defineProps({
   user: {
@@ -293,6 +347,10 @@ const targetUpgradeLevel = ref('professional');
 
 // 会员等级数据
 const membershipLevels = ref([]);
+
+// 🎯 Token过期处理状态
+const isTokenExpiredHandled = ref(false);
+const backButtonClickCount = ref(0); // 返回按钮点击次数
 
 // 🎯 数字滚动效果相关状态
 const isLoadingPrice = ref(true); // 价格加载状态
@@ -411,43 +469,145 @@ watch(membershipLevels, () => {
   checkPriceLoaded();
 }, { deep: true });
 
+// 处理token过期的统一函数
+const handleTokenExpired = async () => {
+  if (isTokenExpiredHandled.value) {
+    console.log('🔐 Token过期已在处理中，跳过重复处理');
+    return; // 已经处理过了，不重复处理
+  }
+  isTokenExpiredHandled.value = true;
+  
+  console.log('🔐 检测到token过期，开始智能重新认证流程');
+  
+  try {
+    // 方法1: 尝试使用refresh token刷新
+    console.log('🔄 尝试使用refresh token刷新...');
+    const refreshResult = await refreshToken();
+    if (refreshResult === true) {
+      console.log('✅ Token刷新成功，重新加载数据');
+      
+      // 重置状态，重新加载页面数据
+      isTokenExpiredHandled.value = false;
+      
+      // 通知父组件刷新用户信息
+      emit('refresh-user-info');
+      
+      // 重新加载当前页面数据，不刷新页面
+      await loadPageData();
+      return;
+    }
+  } catch (error) {
+    console.log('❌ Refresh token刷新失败:', error.message);
+  }
+  
+  try {
+    // 方法2: 尝试重新初始化认证
+    console.log('🚀 尝试重新初始化认证...');
+    const authResult = await initializeAuth();
+    if (authResult) {
+      console.log('✅ 重新认证成功，重新加载数据');
+      
+      // 重置状态，重新加载页面数据
+      isTokenExpiredHandled.value = false;
+      
+      // 通知父组件刷新用户信息
+      emit('refresh-user-info');
+      
+      // 重新加载当前页面数据，不刷新页面
+      await loadPageData();
+      return;
+    }
+  } catch (error) {
+    console.log('❌ 重新认证失败:', error.message);
+  }
+  
+  // 方法3: 如果以上方法都失败，则刷新页面
+  console.log('🔄 智能认证失败，回退到页面刷新方式');
+  ElMessage.warning('正在刷新页面以重新认证...');
+  
+  // 清除过期的认证信息
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user_info');
+  localStorage.removeItem('token_expires_at');
+  
+  // 延迟刷新插件，让用户看到提示信息
+  setTimeout(() => {
+    console.log('开始页面刷新重新认证流程...');
+    window.location.reload();
+  }, 2000);
+};
+
+// 重新加载页面数据的函数
+const loadPageData = async () => {
+  try {
+    console.log('🔄 重新加载页面数据...');
+    
+    // 重新获取会员等级列表
+    const response = await getMembershipLevelsNew();
+    if (response && response.data && response.data.levels) {
+      membershipLevels.value = response.data.levels;
+      console.log('✅ 会员等级数据已重新加载');
+    }
+    
+    // 重新获取积分套餐
+    const packagesResponse = await getPointsPackages();
+    if (packagesResponse && packagesResponse.data) {
+      pointsPackages.value = packagesResponse.data;
+      console.log('✅ 积分套餐数据已重新加载');
+    }
+    
+    // 重新获取积分消费记录
+    await loadPointsTransactions();
+    
+    console.log('✅ 页面数据重新加载完成');
+  } catch (error) {
+    console.error('❌ 重新加载页面数据失败:', error);
+  }
+};
+
+// 加载积分消费记录
+const loadPointsTransactions = async () => {
+  try {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    
+    const response = await getPointsTransactions({
+      startDate: firstDay.toISOString().split('T')[0],
+      endDate: lastDay.toISOString().split('T')[0],
+      type: 'consume'
+    });
+    
+    if (response && response.data && response.data.transactions) {
+      let total = 0;
+      response.data.transactions.forEach(trans => {
+        total += Math.abs(trans.points);
+      });
+      monthlyPointsUsed.value = total;
+      console.log('✅ 积分消费记录获取成功');
+    }
+  } catch (error) {
+    console.error('❌ 获取积分消费记录失败:', error);
+    
+    // 检查是否为token过期错误
+    if (isTokenExpiredError(error)) {
+      console.log('🔐 积分消费API检测到token过期');
+      await handleTokenExpired();
+      return;
+    }
+    
+    // 设置默认数据
+    monthlyPointsUsed.value = 12680;
+    console.log('📊 使用默认积分消费数据');
+  }
+};
+
 onMounted(async () => {
   console.log('会员等级数据:', membershipLevels.value);
   
   // 🎯 启动价格闪烁效果
   startPriceAnimation();
-  
-  // 全局token过期处理标志，确保只处理一次
-  let isTokenExpiredHandled = false;
-  
-  // 处理token过期的统一函数
-  const handleTokenExpired = () => {
-    if (isTokenExpiredHandled) {
-      return; // 已经处理过了，不重复处理
-    }
-    isTokenExpiredHandled = true;
-    
-    console.log('检测到token过期，开始统一处理');
-    
-    // 显示友好的提示信息
-    ElMessage.warning({
-      message: '登录状态已过期，正在重新获取认证信息...',
-      duration: 3000
-    });
-    
-    // 清除过期的认证信息
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user_info');
-    localStorage.removeItem('token_expires_at');
-    
-    // 延迟刷新插件，让用户看到提示信息
-    setTimeout(() => {
-      console.log('开始重新认证流程...');
-      // 刷新整个插件页面以重新获取token
-      window.location.reload();
-    }, 2000);
-  };
   
   // 检查错误是否为token过期
   const isTokenExpiredError = (error) => {
@@ -530,7 +690,7 @@ onMounted(async () => {
   }
   
   // 如果已经处理了token过期，停止后续API调用
-  if (isTokenExpiredHandled) {
+  if (isTokenExpiredHandled.value) {
     console.log('⚠️ Token过期已处理，跳过后续API调用');
     return;
   }
@@ -538,7 +698,7 @@ onMounted(async () => {
   // 获取积分套餐列表 - 后台异步更新，不影响初始显示
   try {
     // 再次检查token过期状态
-    if (isTokenExpiredHandled) return;
+    if (isTokenExpiredHandled.value) return;
     
     const packageResponse = await getPointsPackages();
     if (packageResponse && packageResponse.data && packageResponse.data.packages) {
@@ -570,45 +730,13 @@ onMounted(async () => {
   }
   
   // 再次检查token过期状态，避免重复API调用
-  if (isTokenExpiredHandled) {
+  if (isTokenExpiredHandled.value) {
     console.log('⚠️ Token过期已处理，跳过积分消费记录API');
     return;
   }
   
   // 获取本月积分消费
-  try {
-    const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    
-    const response = await getPointsTransactions({
-      startDate: firstDay.toISOString().split('T')[0],
-      endDate: lastDay.toISOString().split('T')[0],
-      type: 'consume'
-    });
-    
-    if (response && response.data && response.data.transactions) {
-      let total = 0;
-      response.data.transactions.forEach(trans => {
-        total += Math.abs(trans.points);
-      });
-      monthlyPointsUsed.value = total;
-      console.log('✅ 积分消费记录获取成功');
-    }
-  } catch (error) {
-    console.error('❌ 获取积分消费记录失败:', error);
-    
-    // 检查是否为token过期错误
-    if (isTokenExpiredError(error)) {
-      console.log('🔐 积分消费API检测到token过期');
-      handleTokenExpired();
-      return;
-    }
-    
-    // 设置默认数据
-    monthlyPointsUsed.value = 12680;
-    console.log('📊 使用默认积分消费数据');
-  }
+  await loadPointsTransactions();
 });
 
 // 处理会员等级标签切换
@@ -824,16 +952,87 @@ const joinOfficialGroup = () => {
 };
 
 // 返回上一页
-const goBack = () => {
-  console.log('[会员中心] 返回首页，刷新用户信息');
+const goBack = async () => {
+  backButtonClickCount.value++;
+  console.log(`[会员中心] 点击返回按钮 (第${backButtonClickCount.value}次)`);
   
-  // 通知父组件刷新用户信息
-  emit('refresh-user-info');
+  // 如果点击次数超过2次，强制刷新页面
+  if (backButtonClickCount.value >= 3) {
+    console.log('🔄 检测到多次点击返回按钮，强制刷新页面');
+    ElMessage.warning('正在刷新页面...');
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
+    return;
+  }
   
-  // 延迟一下再返回，确保刷新完成
-  setTimeout(() => {
-    router.back();
-  }, 100);
+  // 检查是否已经处理了token过期
+  if (isTokenExpiredHandled.value) {
+    console.log('🔐 检测到token已过期，尝试智能重新认证');
+    try {
+      await handleTokenExpired();
+      // 认证成功后正常返回
+      if (!isTokenExpiredHandled.value) {
+        console.log('[会员中心] 重新认证成功，正常返回首页');
+        emit('refresh-user-info');
+        setTimeout(() => {
+          router.back();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('智能重新认证失败:', error);
+    }
+    return;
+  }
+  
+  // 检查localStorage中是否还有有效token
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    console.log('🔐 未找到token，尝试智能重新认证');
+    try {
+      await handleTokenExpired();
+      // 认证成功后正常返回
+      if (!isTokenExpiredHandled.value) {
+        console.log('[会员中心] 重新认证成功，正常返回首页');
+        emit('refresh-user-info');
+        setTimeout(() => {
+          router.back();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('智能重新认证失败:', error);
+    }
+    return;
+  }
+  
+  console.log('[会员中心] 正常返回首页，刷新用户信息');
+  
+  try {
+    // 通知父组件刷新用户信息
+    emit('refresh-user-info');
+    
+    // 延迟一下再返回，确保刷新完成
+    setTimeout(() => {
+      router.back();
+    }, 100);
+  } catch (error) {
+    console.error('[会员中心] 返回操作失败:', error);
+    // 如果返回失败，尝试智能重新认证
+    console.log('🔐 返回失败，可能是认证问题，尝试重新认证');
+    try {
+      await handleTokenExpired();
+      // 认证成功后正常返回
+      if (!isTokenExpiredHandled.value) {
+        console.log('[会员中心] 重新认证成功，正常返回首页');
+        emit('refresh-user-info');
+        setTimeout(() => {
+          router.back();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('智能重新认证失败:', error);
+    }
+  }
 };
 
 // 🎯 组件卸载时清理定时器
@@ -844,6 +1043,77 @@ onUnmounted(() => {
     console.log('🧹 组件卸载，清理定时器');
   }
 });
+
+// 🔧 调试功能 - 仅在开发环境显示
+const isDebugMode = ref(false);
+
+// 切换调试模式
+const toggleDebugMode = () => {
+  isDebugMode.value = !isDebugMode.value;
+  console.log('🔧 调试模式:', isDebugMode.value ? '开启' : '关闭');
+};
+
+// 测试RefreshToken功能
+const testRefreshToken = async () => {
+  console.log('🧪 === 手动测试RefreshToken功能 ===');
+  try {
+    const result = await refreshToken();
+    if (result) {
+      ElMessage.success('RefreshToken测试成功！');
+      console.log('✅ RefreshToken测试成功');
+    } else {
+      ElMessage.error('RefreshToken测试失败');
+      console.log('❌ RefreshToken测试失败');
+    }
+  } catch (error) {
+    ElMessage.error(`RefreshToken测试出错: ${error.message}`);
+    console.error('❌ RefreshToken测试出错:', error);
+  }
+};
+
+// 生成认证报告
+const generateDebugReport = async () => {
+  console.log('📊 生成认证调试报告...');
+  ElMessage.info('正在生成认证调试报告，请查看控制台');
+  try {
+    await generateAuthReport();
+    ElMessage.success('认证调试报告已生成，请查看控制台');
+  } catch (error) {
+    ElMessage.error('生成调试报告失败');
+    console.error('生成调试报告失败:', error);
+  }
+};
+
+// 诊断认证问题
+const diagnoseAuth = () => {
+  console.log('🔧 诊断认证问题...');
+  ElMessage.info('正在诊断认证问题，请查看控制台');
+  const diagnosis = diagnoseRefreshTokenIssue();
+  
+  if (diagnosis.hasRefreshToken && diagnosis.hasAccessToken) {
+    if (diagnosis.isTokenExpired) {
+      ElMessage.warning('Token已过期，但有RefreshToken可用');
+    } else {
+      ElMessage.success('认证状态正常');
+    }
+  } else if (!diagnosis.hasRefreshToken) {
+    ElMessage.error('缺少RefreshToken，建议重新认证');
+  } else {
+    ElMessage.warning('认证状态异常，请查看控制台详情');
+  }
+};
+
+// 模拟Token过期
+const simulateExpiry = () => {
+  console.log('🧪 模拟Token过期...');
+  const success = simulateTokenExpiry();
+  if (success) {
+    ElMessage.success('已模拟Token过期场景');
+    checkAuthStatus(); // 显示当前状态
+  } else {
+    ElMessage.error('模拟Token过期失败，请查看控制台');
+  }
+};
 </script>
 
 <style scoped>
@@ -1299,5 +1569,49 @@ onUnmounted(() => {
   .packages-list {
     justify-content: flex-start;
   }
+}
+
+/* 调试面板样式 */
+.debug-panel {
+  padding: 16px;
+}
+
+.debug-info {
+  margin-bottom: 16px;
+  background: #f5f7fa;
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.debug-info p {
+  margin: 0 0 8px 0;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.debug-info ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.debug-info li {
+  margin-bottom: 4px;
+  color: #606266;
+}
+
+.debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.debug-tips {
+  margin-top: 16px;
+}
+
+.debug-tips .el-alert p {
+  margin: 2px 0;
+  font-size: 13px;
 }
 </style> 

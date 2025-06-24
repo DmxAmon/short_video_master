@@ -89,6 +89,11 @@ import {
   getOrderStatus, 
   getCurrentMembership 
 } from '../api/membership';
+// 导入智能认证工具
+import { useSmartAuth } from '../utils/smart-auth';
+
+// 使用智能认证
+const { isTokenExpiredError, handleTokenExpiredSmart, createSmartApiCall } = useSmartAuth('API测试页面');
 
 // 响应式数据
 const packagesResult = ref(null);
@@ -126,7 +131,12 @@ const clearLogs = () => {
 const testGetPackages = async () => {
   try {
     addLog('INFO', '开始测试获取会员套餐列表...');
-    const result = await getMembershipPackages();
+    const smartApiCall = createSmartApiCall(getMembershipPackages, {
+      onSuccess: async () => {
+        addLog('INFO', '智能认证成功，重新获取套餐列表');
+      }
+    });
+    const result = await smartApiCall();
     packagesResult.value = result;
     addLog('SUCCESS', '获取套餐列表成功');
     ElMessage.success('获取套餐列表成功');

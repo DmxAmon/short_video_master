@@ -365,6 +365,8 @@ import {
 import { Lock, Select, VideoPlay, DocumentCopy } from '@element-plus/icons-vue'
 import { bitable, FieldType } from '@lark-base-open/js-sdk'
 import { envConfig } from '../config/env'
+// 导入智能认证工具
+import { useSmartAuth } from '../utils/smart-auth'
 
 // 定义props
 const props = defineProps({
@@ -373,6 +375,9 @@ const props = defineProps({
     required: true
   }
 });
+
+// 使用智能认证
+const { isTokenExpiredError, handleTokenExpiredSmart, resetTokenExpiredState } = useSmartAuth('转写页面');
 
 // 用户权限
 const userPermissions = computed(() => {
@@ -1097,7 +1102,38 @@ const startTranscribe = async () => {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // 检查是否为401错误，使用智能认证处理
+        if (response.status === 401) {
+          const authSuccess = await handleTokenExpiredSmart({
+            onSuccess: async () => {
+              console.log('✅ 智能认证成功，重试转写请求');
+              // 重试转写请求
+              const retryResponse = await fetch(`${backendUrl}/douyin/transcribe`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+              });
+              
+              if (retryResponse.ok) {
+                const retryResult = await retryResponse.json();
+                if (retryResult.code === 0) {
+                  console.log('转写完成:', retryResult.data);
+                  ElMessage.success(`已完成 ${videos.length} 个视频的转写`);
+                }
+              }
+            }
+          });
+          
+          if (!authSuccess) {
+            throw new Error('认证失败，无法完成转写');
+          }
+          return; // 智能认证处理完成，退出
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
       
       const result = await response.json();
@@ -1111,6 +1147,18 @@ const startTranscribe = async () => {
       }
     } catch (apiError) {
       console.error('转写API调用失败:', apiError);
+      
+      // 检查是否为token过期错误
+      if (isTokenExpiredError(apiError)) {
+        await handleTokenExpiredSmart({
+          onSuccess: async () => {
+            console.log('✅ 智能认证成功，请重新尝试转写');
+            ElMessage.info('认证已恢复，请重新点击开始转写');
+          }
+        });
+        return;
+      }
+      
       throw apiError;
     }
     

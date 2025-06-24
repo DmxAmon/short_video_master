@@ -48,30 +48,28 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 // 统一处理token过期的函数
-const handleTokenExpired = (message: string = '登录已过期，请刷新插件页面') => {
+const handleTokenExpired = (message: string = '登录已过期') => {
   if (isTokenExpired) {
     return; // 已经在处理中，避免重复处理
   }
   
   isTokenExpired = true;
-  logger.authEvent('Token已过期，开始清理并刷新页面');
+  logger.authEvent('Token已过期，清理认证信息');
   
   // 清除所有认证信息
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user_info');
   
-  // 显示提示信息
+  // 只显示提示信息，不自动刷新页面
   ElMessage({
     message,
     type: 'warning',
     duration: 2000,
   });
   
-  // 延迟刷新页面，让用户看到提示
-  setTimeout(() => {
-    window.location.reload();
-  }, 500);
+  // 移除自动页面刷新逻辑，让统一的token过期处理来处理
+  console.log('🔐 Request拦截器检测到token过期，已清除认证信息');
 };
 
 // 刷新令牌函数

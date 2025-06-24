@@ -45,8 +45,8 @@ api.interceptors.response.use(
       localStorage.removeItem('user_info');
       localStorage.removeItem('token_expires_at');
       
-      // 刷新页面重新初始化认证
-      window.location.reload();
+      // 移除自动刷新页面的逻辑，让统一的token过期处理来处理
+      console.log('🔐 支付API检测到401错误，交由统一处理');
     }
     
     return Promise.reject(error);
