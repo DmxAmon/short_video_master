@@ -603,27 +603,39 @@ const loadPointsTransactions = async () => {
   }
 };
 
+// 检查错误是否为token过期
+const isTokenExpiredError = (error) => {
+  // 检查HTTP状态码401
+  if (error.response && error.response.status === 401) {
+    return true;
+  }
+  
+  // 检查错误信息中的关键词
+  return error.message && (
+    error.message.includes('Token') || 
+    error.message.includes('登录') || 
+    error.message.includes('过期') ||
+    error.message.includes('Unauthorized') ||
+    error.message.includes('401')
+  );
+};
+
 onMounted(async () => {
   console.log('会员等级数据:', membershipLevels.value);
   
   // 🎯 启动价格闪烁效果
   startPriceAnimation();
   
-  // 检查错误是否为token过期
-  const isTokenExpiredError = (error) => {
-    // 检查HTTP状态码401
-    if (error.response && error.response.status === 401) {
-      return true;
+  // 定义token过期处理函数
+  const handleApiError = async (error, apiName) => {
+    if (isTokenExpiredError(error)) {
+      console.log(`🔐 ${apiName}检测到token过期`);
+      if (!isTokenExpiredHandled.value) {
+        await handleTokenExpired();
+      }
+      return true; // 表示已处理token过期
     }
-    
-    // 检查错误信息中的关键词
-    return error.message && (
-      error.message.includes('Token') || 
-      error.message.includes('登录') || 
-      error.message.includes('过期') ||
-      error.message.includes('Unauthorized') ||
-      error.message.includes('401')
-    );
+    return false; // 表示不是token过期错误
   };
   
   // 获取会员等级列表
@@ -650,9 +662,9 @@ onMounted(async () => {
     console.error('获取会员等级失败:', error);
     
     // 检查是否为token过期错误
-    if (isTokenExpiredError(error)) {
-      handleTokenExpired();
-      return; // 立即停止执行
+    const isTokenError = await handleApiError(error, '会员等级API');
+    if (isTokenError) {
+      return; // token过期已处理，等待页面重新加载
     }
     
     // 设置默认数据
@@ -689,17 +701,23 @@ onMounted(async () => {
     }, 1500);
   }
   
-  // 如果已经处理了token过期，停止后续API调用
+  // 如果已经处理了token过期，等待处理完成后再继续
   if (isTokenExpiredHandled.value) {
-    console.log('⚠️ Token过期已处理，跳过后续API调用');
+    console.log('⚠️ Token过期处理中，等待认证完成...');
     return;
   }
   
-  // 获取积分套餐列表 - 后台异步更新，不影响初始显示
+  // 添加短暂延迟，确保会员等级API完成后再调用积分API
+  await new Promise(resolve => setTimeout(resolve, 200));
+  
+  // 再次检查token过期状态
+  if (isTokenExpiredHandled.value) {
+    console.log('⚠️ Token过期已处理，跳过积分API调用');
+    return;
+  }
+  
+  // 获取积分套餐列表 - 确保在token刷新完成后调用
   try {
-    // 再次检查token过期状态
-    if (isTokenExpiredHandled.value) return;
-    
     const packageResponse = await getPointsPackages();
     if (packageResponse && packageResponse.data && packageResponse.data.packages) {
       // 成功获取后端数据时，更新套餐列表
@@ -719,10 +737,9 @@ onMounted(async () => {
     console.error('❌ 获取积分套餐失败:', error);
     
     // 检查是否为token过期错误
-    if (isTokenExpiredError(error)) {
-      console.log('🔐 积分套餐API检测到token过期');
-      handleTokenExpired();
-      return;
+    const isTokenError = await handleApiError(error, '积分套餐API');
+    if (isTokenError) {
+      return; // token过期已处理
     }
     
     // 发生其他错误时保持使用初始的真实套餐数据，不改变显示
@@ -734,6 +751,9 @@ onMounted(async () => {
     console.log('⚠️ Token过期已处理，跳过积分消费记录API');
     return;
   }
+  
+  // 添加延迟确保积分套餐API完成后再调用消费记录API
+  await new Promise(resolve => setTimeout(resolve, 200));
   
   // 获取本月积分消费
   await loadPointsTransactions();

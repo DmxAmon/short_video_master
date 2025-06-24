@@ -8,7 +8,13 @@
  */
 
 // 首先导入并初始化日志控制系统（必须在所有其他代码之前）
-import './utils/logger.js';
+import { interceptConsole, LOG_CONFIG } from './utils/logger.js';
+
+// 强制初始化console拦截器
+if (LOG_CONFIG.interceptConsole && !LOG_CONFIG.enabled) {
+  interceptConsole();
+  console.log('🔇 Console拦截器已强制启用');
+}
 
 import { createApp } from 'vue';
 import App from './App.vue';
